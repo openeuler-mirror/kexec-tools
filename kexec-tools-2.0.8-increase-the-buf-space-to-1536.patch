@@ -1,0 +1,31 @@
+From 072c36f24d52f3c3c864ace33da675a8e5c009d8 Mon Sep 17 00:00:00 2001
+From: Jialong Chen <chenjialong@huawei.com>
+Date: Tue, 24 Oct 2017 17:10:21 +0800
+Subject: [PATCH] kexec-tools: increase the buf space to 1536
+
+reason: increase the buf space to 1536
+
+Signed-off-by: Jialong Chen <chenjialong@huawei.com>
+---
+ kexec/arch/arm64/kexec-arm64.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/kexec/arch/arm64/kexec-arm64.h b/kexec/arch/arm64/kexec-arm64.h
+index 7e4d056..0490d07 100644
+--- a/kexec/arch/arm64/kexec-arm64.h
++++ b/kexec/arch/arm64/kexec-arm64.h
+@@ -15,7 +15,10 @@
+ 
+ #define BOOT_BLOCK_VERSION 17
+ #define BOOT_BLOCK_LAST_COMP_VERSION 16
+-#define COMMAND_LINE_SIZE 512
++/* kernel define COMMAND_LINE_SIZE 2048, kexec will append some parameter to follow command_line
++ * so we define COMMAND_LINE_SIZE 1024+512 here.
++*/
++#define COMMAND_LINE_SIZE 1536
+ 
+ #define KiB(x) ((x) * 1024UL)
+ #define MiB(x) (KiB(x) * 1024UL)
+-- 
+1.8.3.1
+

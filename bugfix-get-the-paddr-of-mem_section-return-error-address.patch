@@ -1,0 +1,37 @@
+From daa57a0d1aa31fad5811ba70d37e1ed23773151e Mon Sep 17 00:00:00 2001
+From: kangenbo <kangenbo@huawei.com>
+Date: Wed, 30 Jan 2019 15:50:31 +0800
+Subject: [PATCH] kexec-tools: get the paddr of mem_section return error address
+
+reason: get the paddr of mem_section return error address
+
+Signed-off-by: kangenbo <kangenbo@huawei.com>
+---
+ makedumpfile-1.6.4/arch/arm64.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/makedumpfile-1.6.4/arch/arm64.c b/makedumpfile-1.6.4/arch/arm64.c
+index 2fd3e18..cc59e63 100644
+--- a/makedumpfile-1.6.4/arch/arm64.c
++++ b/makedumpfile-1.6.4/arch/arm64.c
+@@ -336,7 +336,7 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
+ 
+ 	if ((pud_val(pudv) & PUD_TYPE_MASK) == PUD_TYPE_SECT) {
+ 		/* 1GB section for Page Table level = 4 and Page Size = 4KB */
+-		paddr = (pud_val(pudv) & (PUD_MASK & PMD_SECTION_MASK))
++		paddr = (pud_val(pudv) & (PUD_MASK & PHYS_MASK))
+ 					+ (vaddr & (PUD_SIZE - 1));
+ 		return paddr;
+ 	}
+@@ -367,7 +367,7 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
+ 		break;
+ 	case PMD_TYPE_SECT:
+ 		/* 512MB section for Page Table level = 3 and Page Size = 64KB*/
+-		paddr = (pmd_val(pmdv) & (PMD_MASK & PMD_SECTION_MASK))
++		paddr = (pmd_val(pmdv) & (PMD_MASK & PHYS_MASK))
+ 					+ (vaddr & (PMD_SIZE - 1));
+ 		break;
+ 	}
+-- 
+1.7.12.4
+

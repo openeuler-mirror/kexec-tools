@@ -1,0 +1,92 @@
+From 0e709571bfe7e3b8160044970e2084194f9a963b Mon Sep 17 00:00:00 2001
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Mon, 15 Jul 2019 11:32:55 +0530
+Subject: [PATCH 17/20] kexec/kexec-zlib.h: Add 'is_zlib_file()' helper
+ function
+
+https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/commit/?id=0e709571bfe7e3b8160044970e2084194f9a963b
+
+This patch adds 'is_zlib_file()' helper function which can be
+used to quickly determine with the passed kernel image is a zlib
+compressed kernel image.
+
+This is specifically useful for arm64 zImage (or Image.gz) support,
+which is introduced by later patches in this patchset.
+
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/kexec-zlib.h |  1 +
+ kexec/zlib.c       | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/kexec/kexec-zlib.h b/kexec/kexec-zlib.h
+index 43c107b..16300f2 100644
+--- a/kexec/kexec-zlib.h
++++ b/kexec/kexec-zlib.h
+@@ -6,5 +6,6 @@
+ 
+ #include "config.h"
+ 
++int is_zlib_file(const char *filename, off_t *r_size);
+ char *zlib_decompress_file(const char *filename, off_t *r_size);
+ #endif /* __KEXEC_ZLIB_H */
+diff --git a/kexec/zlib.c b/kexec/zlib.c
+index 95b6080..9bc340d 100644
+--- a/kexec/zlib.c
++++ b/kexec/zlib.c
+@@ -23,6 +23,38 @@ static void _gzerror(gzFile fp, int *errnum, const char **errmsg)
+ 	}
+ }
+ 
++int is_zlib_file(const char *filename, off_t *r_size)
++{
++	gzFile fp;
++	int errnum;
++	int is_zlib_file = 0; /* default: It's not in gzip format */
++	const char *msg;
++	ssize_t result;
++
++	if (!filename)
++		goto out;
++
++	fp = gzopen(filename, "rb");
++	if (fp == 0) {
++		_gzerror(fp, &errnum, &msg);
++		dbgprintf("Cannot open `%s': %s\n", filename, msg);
++		goto out;
++	}
++
++	if (!gzdirect(fp))
++		/* It's in gzip format */
++		is_zlib_file = 1;
++
++	result = gzclose(fp);
++	if (result != Z_OK) {
++		_gzerror(fp, &errnum, &msg);
++		dbgprintf(" Close of %s failed: %s\n", filename, msg);
++	}
++
++out:
++	return is_zlib_file;
++}
++
+ char *zlib_decompress_file(const char *filename, off_t *r_size)
+ {
+ 	gzFile fp;
+@@ -84,6 +116,12 @@ fail:
+ 	return buf;
+ }
+ #else
++
++int is_zlib_file(const char *filename, off_t *r_size)
++{
++	return 0;
++}
++
+ char *zlib_decompress_file(const char *UNUSED(filename), off_t *UNUSED(r_size))
+ {
+ 	return NULL;
+-- 
+1.8.3.1
+
