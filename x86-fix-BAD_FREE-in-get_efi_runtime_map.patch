@@ -1,0 +1,32 @@
+From 8db8b6613a00e736e450401cff6121ec550a72f5 Mon Sep 17 00:00:00 2001
+From: Pingfan Liu <piliu@redhat.com>
+Date: Mon, 22 Oct 2018 15:54:16 +0800
+Subject: [PATCH 53/55] x86: fix BAD_FREE in get_efi_runtime_map()
+
+If the err_out label is reached, address of a stack variable is passed to
+free(). Fix it.
+
+Signed-off-by: Pingfan Liu <piliu@redhat.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/arch/i386/x86-linux-setup.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kexec/arch/i386/x86-linux-setup.c b/kexec/arch/i386/x86-linux-setup.c
+index 6c7d260..6cda12c 100644
+--- a/kexec/arch/i386/x86-linux-setup.c
++++ b/kexec/arch/i386/x86-linux-setup.c
+@@ -595,8 +595,8 @@ static int get_efi_runtime_map(struct efi_mem_descriptor **map)
+ 	closedir(dirp);
+ 	return nr_maps;
+ err_out:
+-	if (map)
+-		free(map);
++	if (*map)
++		free(*map);
+ 	closedir(dirp);
+ 	return 0;
+ }
+-- 
+1.8.3.1
+

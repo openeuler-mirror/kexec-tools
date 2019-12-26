@@ -1,0 +1,40 @@
+From ca4823aa2fc28e00400e65473caeede5cadd0da0 Mon Sep 17 00:00:00 2001
+From: Munehisa Kamata <kamatam@amazon.com>
+Date: Tue, 26 Jun 2018 12:47:29 -0700
+Subject: [PATCH 13/37] arm64: error out if kernel command line is too long
+
+Currently, in arm64, kexec silently truncates kernel command line longer
+than COMMAND_LINE_SIZE - 1. Error out in that case as some other
+architectures already do that. The error message is copied from x86_64.
+
+Suggested-by: Tom Kirchner <tjk@amazon.com>
+Signed-off-by: Munehisa Kamata <kamatam@amazon.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/arch/arm64/kexec-arm64.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
+index a206c17..7a12479 100644
+--- a/kexec/arch/arm64/kexec-arm64.c
++++ b/kexec/arch/arm64/kexec-arm64.c
+@@ -598,8 +598,15 @@ int arm64_load_other_segments(struct kexec_info *info,
+ 	char command_line[COMMAND_LINE_SIZE] = "";
+ 
+ 	if (arm64_opts.command_line) {
++		if (strlen(arm64_opts.command_line) >
++		    sizeof(command_line) - 1) {
++			fprintf(stderr,
++				"Kernel command line too long for kernel!\n");
++			return EFAILED;
++		}
++
+ 		strncpy(command_line, arm64_opts.command_line,
+-			sizeof(command_line));
++			sizeof(command_line) - 1);
+ 		command_line[sizeof(command_line) - 1] = 0;
+ 	}
+ 
+-- 
+2.6.4.windows.1
+

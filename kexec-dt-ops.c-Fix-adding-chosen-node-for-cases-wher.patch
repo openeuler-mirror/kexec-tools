@@ -1,0 +1,67 @@
+From 5570b42444661e212015abaca35b4dc698b9bb97 Mon Sep 17 00:00:00 2001
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Mon, 17 Dec 2018 00:46:54 +0530
+Subject: [PATCH 23/37] kexec/dt-ops.c: Fix adding '/chosen' node for cases
+ where it is not available in dtb passed via --dtb option
+
+While calling 'kexec -l', in case we are passed a .dtb using --dtb
+option which doesn't contain a '/chosen' node, we try to create the
+'/chosen' node and add bootargs to this node.
+
+Currently the 'dt-ops.c' code is buggy as it passes '-FDT_ERR_NOTFOUND'
+to 'fdt_add_subnode()', which leads to the following error:
+
+  # kexec -d --load Image --append 'debug' --dtb rk3399-sapphire.dtb
+
+  <..snip..>
+  dtb_set_property: fdt_add_subnode failed: FDT_ERR_NOTFOUND
+  kexec: Set device tree bootargs failed.
+  get_cells_size: #address-cells:2 #size-cells:2
+  cells_size_fitted: 0-0
+  cells_size_fitted: 0-0
+  setup_2nd_dtb: no kaslr-seed found
+
+This patch passes the correct nodeoffset value to 'fdt_add_subnode()',
+which fixes this issue:
+
+  # kexec -d -l Image --append 'debug' --dtb rk3399-sapphire.dtb
+
+  <..snip..>
+  get_cells_size: #address-cells:2 #size-cells:2
+  cells_size_fitted: 0-0
+  cells_size_fitted: 0-0
+  setup_2nd_dtb: no kaslr-seed found
+
+Reported-by: Vicente Bergas <vicencb@gmail.com>
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/dt-ops.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/kexec/dt-ops.c b/kexec/dt-ops.c
+index f15174c..bdc16dc 100644
+--- a/kexec/dt-ops.c
++++ b/kexec/dt-ops.c
+@@ -80,15 +80,16 @@ int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
+ 	}
+ 
+ 	nodeoffset = fdt_path_offset(new_dtb, node);
+-	
++
+ 	if (nodeoffset == -FDT_ERR_NOTFOUND) {
+-		result = fdt_add_subnode(new_dtb, nodeoffset, node);
++		result = fdt_add_subnode(new_dtb, 0, node);
+ 
+ 		if (result < 0) {
+ 			dbgprintf("%s: fdt_add_subnode failed: %s\n", __func__,
+ 				fdt_strerror(result));
+ 			goto on_error;
+ 		}
++		nodeoffset = result;
+ 	} else if (nodeoffset < 0) {
+ 		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
+ 			fdt_strerror(nodeoffset));
+-- 
+2.6.4.windows.1
+

@@ -1,0 +1,29 @@
+From 776d8f6355fdf77ec63bae4be09b8f40d0c831ad Mon Sep 17 00:00:00 2001
+From: pengyeqing <pengyeqing@huawei.com>
+Date: Sun, 18 Aug 2019 23:59:23 +0000
+Subject: [PATCH] kexec-tools: add secure compile options for makedumpfile
+
+reason:add secure compile options for makedumpfile
+
+Signed-off-by: pengyeqing <pengyeqing@huawei.com>
+---
+ Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/makedumpfile-1.6.4/Makefile b/makedumpfile-1.6.4/Makefile
+index 612b9d0..180a64f 100644
+--- a/makedumpfile-1.6.4/Makefile
++++ b/makedumpfile-1.6.4/Makefile
+@@ -10,7 +10,8 @@ endif
+ 
+ CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
+ 	  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
+-	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
++	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"' \
++	  -fstack-protector-strong -Wl,-z,now
+ CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
+ 		    -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+ # LDFLAGS = -L/usr/local/lib -I/usr/local/include
+-- 
+1.8.3.1
+

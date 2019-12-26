@@ -1,0 +1,84 @@
+From c072bd13abbe497d28e4235e2cf416f4aee65754 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Niklas=20Hamb=C3=BCchen?= <mail@nh2.me>
+Date: Mon, 29 Apr 2019 10:23:14 +0200
+Subject: [PATCH 05/20] x86: Find mounts by FS type, not name
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/commit/?id=c072bd13abbe497d28e4235e2cf416f4aee65754
+
+The name in mount invocations like
+
+		mount -t debugfs debugfs /sys/kernel/debug
+
+is nothing but convention and cannot be relied upon.
+
+For example, https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt
+recommends making the name "none" instead:
+
+		mount -t debugfs none /sys/kernel/debug
+
+and many existing systems use mounts named "none" or otherwise.
+
+Using `mnt_type` instead of `mnt_fsname` allows kexec to work
+on such systems.
+
+This fixes another instance of `poweroff` not working on kexec'ed
+kernels because the lack of correctly matched mount results in EFI
+variables not being read and propagated.
+
+Signed-off-by: Niklas Hambüchen <mail@nh2.me>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/arch/i386/x86-linux-setup.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/kexec/arch/i386/x86-linux-setup.c b/kexec/arch/i386/x86-linux-setup.c
+index 74fb0c4..b643c8b 100644
+--- a/kexec/arch/i386/x86-linux-setup.c
++++ b/kexec/arch/i386/x86-linux-setup.c
+@@ -433,8 +433,12 @@ out:
+  * This really only makes sense for virtual filesystems that are only expected
+  * to be mounted once (sysfs, debugsfs, proc), as it will return the first
+  * instance listed in /proc/mounts, falling back to mtab if absent.
++ * We search by type and not by name because the name can be anything;
++ * while setting the name equal to the mount point is common, it cannot be
++ * relied upon, as even kernel documentation examples recommends using
++ * "none" as the name e.g. for debugfs.
+  */
+-char *find_mnt_by_fsname(char *fsname)
++char *find_mnt_by_type(char *type)
+ {
+ 	FILE *mtab;
+ 	struct mntent *mnt;
+@@ -448,7 +452,7 @@ char *find_mnt_by_fsname(char *fsname)
+ 	if (!mtab)
+ 		return NULL;
+ 	for(mnt = getmntent(mtab); mnt; mnt = getmntent(mtab)) {
+-		if (strcmp(mnt->mnt_fsname, fsname) == 0)
++		if (strcmp(mnt->mnt_type, type) == 0)
+ 			break;
+ 	}
+ 	mntdir = mnt ? strdup(mnt->mnt_dir) : NULL;
+@@ -463,7 +467,7 @@ static int get_bootparam(void *buf, off_t offset, size_t size)
+ 	char filename[PATH_MAX];
+ 	int err, has_sysfs_params = 0;
+ 
+-	sysfs_mnt = find_mnt_by_fsname("sysfs");
++	sysfs_mnt = find_mnt_by_type("sysfs");
+ 	if (sysfs_mnt) {
+ 		snprintf(filename, PATH_MAX, "%s/%s", sysfs_mnt,
+ 			"kernel/boot_params/data");
+@@ -474,7 +478,7 @@ static int get_bootparam(void *buf, off_t offset, size_t size)
+ 	}
+ 
+ 	if (!has_sysfs_params) {
+-		debugfs_mnt = find_mnt_by_fsname("debugfs");
++		debugfs_mnt = find_mnt_by_type("debugfs");
+ 		if (!debugfs_mnt)
+ 			return 1;
+ 		snprintf(filename, PATH_MAX, "%s/%s", debugfs_mnt,
+-- 
+1.8.3.1
+
