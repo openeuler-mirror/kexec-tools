@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.17
-Release: 14
+Release: 15
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -81,7 +81,7 @@ Patch9001: bugfix-get-the-paddr-of-mem_section-return-error-address.patch
 Patch9002: arm64-support-more-than-one-crash-kernel-regions.patch
 %endif
 
-Patch9003: makedumpfile-modify-SECTIONS_SIZE_BITS-to-27-for-arm.patch
+Patch9003: add-secure-compile-options-for-makedumpfile.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -301,6 +301,12 @@ done
 %endif
 
 %changelog
+* Wed Jan 1 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.17-15
+- Type:enhancement
+- ID:NA
+- SUG:NA
+- DESC:modify patch
+
 * Tue Dec 31 2019 Jialong Chen <chenjialong@huawei.com> - 2.0.17-14
 - Type:enhancement
 - ID:NA
