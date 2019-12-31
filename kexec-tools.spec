@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.17
-Release: 13
+Release: 14
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -82,7 +82,6 @@ Patch9002: arm64-support-more-than-one-crash-kernel-regions.patch
 %endif
 
 Patch9003: makedumpfile-modify-SECTIONS_SIZE_BITS-to-27-for-arm.patch
-Patch9004: add-secure-compile-options-for-makedumpfile.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -121,7 +120,6 @@ tar -z -x -v -f %{SOURCE19}
 %endif
 
 %patch9003 -p1
-%patch9004 -p1
 
 %build
 autoreconf
@@ -205,6 +203,7 @@ cp %{SOURCE108} %{buildroot}/etc/kdump-adv-conf/kdump_dracut_modules/99earlykdum
 cp %{SOURCE109} %{buildroot}/etc/kdump-adv-conf/kdump_dracut_modules/99earlykdump/%{remove_dracut_early_kdump_prefix %{SOURCE109}}
 chmod 755 %{buildroot}/etc/kdump-adv-conf/kdump_dracut_modules/99earlykdump/%{remove_dracut_prefix %{SOURCE108}}
 chmod 755 %{buildroot}/etc/kdump-adv-conf/kdump_dracut_modules/99earlykdump/%{remove_dracut_early_kdump_prefix %{SOURCE109}}
+chmod 755 %{buildroot}/etc/kdump-adv-conf/kdump_dracut_modules/99kdumpbase/%{remove_dracut_prefix %{SOURCE103}}
 
 %define dracutlibdir %{_prefix}/lib/dracut
 # For custom dracut modules
@@ -302,6 +301,13 @@ done
 %endif
 
 %changelog
+* Tue Dec 31 2019 Jialong Chen <chenjialong@huawei.com> - 2.0.17-14
+- Type:enhancement
+- ID:NA
+- SUG:NA
+- DESC:modify SECTION_SIZE_BITS to 30 and keep the same as the kernel configuration.
+       add executable permissions for kdump-error-handler.sh.
+
 * Thu Dec 19 2019 chengquan <chengquan3@huawei.com> - 2.0.17-13
 - Type:enhancement
 - ID:NA
