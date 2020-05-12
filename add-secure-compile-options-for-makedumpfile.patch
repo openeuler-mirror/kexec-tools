@@ -7,23 +7,26 @@ reason:add secure compile options for makedumpfile
 
 Signed-off-by: pengyeqing <pengyeqing@huawei.com>
 ---
- Makefile | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Makefile | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/makedumpfile-1.6.4/Makefile b/makedumpfile-1.6.4/Makefile
+diff --git a/makedumpfile-1.6.7/Makefile b/makedumpfile-1.6.7/Makefile
 index 612b9d0..180a64f 100644
---- a/makedumpfile-1.6.4/Makefile
-+++ b/makedumpfile-1.6.4/Makefile
-@@ -10,7 +10,8 @@ endif
+--- a/makedumpfile-1.6.7/Makefile
++++ b/makedumpfile-1.6.7/Makefile
+@@ -10,9 +10,10 @@ endif
  
- CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
- 	  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
--	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
-+	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"' \
-+	  -fstack-protector-strong -Wl,-z,now
- CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
- 		    -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+ CFLAGS_BASE := $(CFLAGS) -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
+ 		-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+-CFLAGS      := $(CFLAGS_BASE) -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
+-CFLAGS_ARCH := $(CFLAGS_BASE)
++CFLAGS      := $(CFLAGS_BASE) -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"' -fstack-protector-strong -Wl,-z,now -fPIE
++CFLAGS_ARCH := $(CFLAGS_BASE) -fPIE
  # LDFLAGS = -L/usr/local/lib -I/usr/local/include
++LDFLAGS += -pie
+ 
+ HOST_ARCH := $(shell uname -m)
+ # Use TARGET as the target architecture if specified.
 -- 
 1.8.3.1
 
