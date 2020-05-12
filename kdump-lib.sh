@@ -28,6 +28,11 @@ perror() {
     echo $@ >&2
 }
 
+is_fs_type_nfs()
+{
+    [ "$1" = "nfs" ] || [ "$1" = "nfs4" ]
+}
+
 is_ssh_dump_target()
 {
     grep -q "^ssh[[:blank:]].*@" /etc/kdump.conf
@@ -35,20 +40,28 @@ is_ssh_dump_target()
 
 is_nfs_dump_target()
 {
-    grep -q "^nfs" /etc/kdump.conf || \
-        [[ $(get_dracut_args_fstype "$(grep "^dracut_args .*\-\-mount" /etc/kdump.conf)") = nfs* ]]
+    if grep -q "^nfs" /etc/kdump.conf; then
+        return 0;
+    fi
+
+    if is_fs_type_nfs $(get_dracut_args_fstype "$(grep "^dracut_args .*\-\-mount" /etc/kdump.conf)"); then
+        return 0
+    fi
+
+    local _save_path=$(get_save_path)
+    local _target=$(get_target_from_path $_save_path)
+    local _fstype=$(get_fs_type_from_target $_target)
+
+    if is_fs_type_nfs $_fstype; then
+        return 0
+    fi
+
+    return 1
 }
 
 is_raw_dump_target()
 {
     grep -q "^raw" /etc/kdump.conf
-}
-
-is_fs_type_nfs()
-{
-    local _fstype=$1
-    [ $_fstype = "nfs" ] || [ $_fstype = "nfs4" ] && return 0
-    return 1
 }
 
 is_fs_dump_target()
@@ -59,6 +72,14 @@ is_fs_dump_target()
 strip_comments()
 {
     echo $@ | sed -e 's/\(.*\)#.*/\1/'
+}
+
+# Read from kdump config file stripping all comments
+read_strip_comments()
+{
+    # strip heading spaces, and print any content starting with
+    # neither space or #, and strip everything after #
+    sed -n -e "s/^\s*\([^# \t][^#]\+\).*/\1/gp" $1
 }
 
 # Check if fence kdump is configured in Pacemaker cluster
@@ -96,8 +117,7 @@ to_dev_name() {
 
 is_user_configured_dump_target()
 {
-    return $(is_mount_in_dracut_args || is_ssh_dump_target || is_nfs_dump_target || \
-             is_raw_dump_target || is_fs_dump_target)
+    grep -E -q "^ext[234]|^xfs|^btrfs|^minix|^raw|^nfs|^ssh" /etc/kdump.conf || is_mount_in_dracut_args;
 }
 
 get_user_configured_dump_disk()
@@ -113,21 +133,16 @@ get_user_configured_dump_disk()
 
 get_root_fs_device()
 {
-    local _target
-    _target=$(findmnt -k -f -n -o SOURCE /)
-    [ -n "$_target" ] && echo $_target
-
-    return
+    findmnt -k -f -n -o SOURCE /
 }
 
 get_save_path()
 {
-	local _save_path=$(grep "^path" /etc/kdump.conf|awk '{print $2}')
-	if [ -z "$_save_path" ]; then
-		_save_path=$DEFAULT_PATH
-	fi
+    local _save_path=$(awk '$1 == "path" {print $2}' /etc/kdump.conf)
+    [ -z "$_save_path" ] && _save_path=$DEFAULT_PATH
 
-	echo $_save_path
+    # strip the duplicated "/"
+    echo $_save_path | tr -s /
 }
 
 get_block_dump_target()
@@ -149,10 +164,10 @@ get_block_dump_target()
 
 is_dump_to_rootfs()
 {
-    grep "^default[[:space:]]dump_to_rootfs" /etc/kdump.conf >/dev/null
+    grep -E "^(failure_action|default)[[:space:]]dump_to_rootfs" /etc/kdump.conf >/dev/null
 }
 
-get_default_action_target()
+get_failure_action_target()
 {
     local _target
 
@@ -181,7 +196,7 @@ get_kdump_targets()
     fi
 
     # Add the root device if dump_to_rootfs is specified.
-    _root=$(get_default_action_target)
+    _root=$(get_failure_action_target)
     if [ -n "$_root" -a "$kdump_targets" != "$_root" ]; then
         kdump_targets="$kdump_targets $_root"
     fi
@@ -189,44 +204,39 @@ get_kdump_targets()
     echo "$kdump_targets"
 }
 
-
+# Return the bind mount source path, return the path itself if it's not bind mounted
+# Eg. if /path/to/src is bind mounted to /mnt/bind, then:
+# /mnt/bind -> /path/to/src, /mnt/bind/dump -> /path/to/src/dump
+#
 # findmnt uses the option "-v, --nofsroot" to exclusive the [/dir]
 # in the SOURCE column for bind-mounts, then if $_mntpoint equals to
 # $_mntpoint_nofsroot, the mountpoint is not bind mounted directory.
-is_bind_mount()
-{
-    local _mntpoint=$(findmnt $1 | tail -n 1 | awk '{print $2}')
-    local _mntpoint_nofsroot=$(findmnt -v $1 | tail -n 1 | awk '{print $2}')
-
-    if [[ $_mntpoint = $_mntpoint_nofsroot ]]; then
-        return 1
-    else
-        return 0
-    fi
-}
-
+#
 # Below is just an example for mount info
 # /dev/mapper/atomicos-root[/ostree/deploy/rhel-atomic-host/var], if the
 # directory is bind mounted. The former part represents the device path, rest
 # part is the bind mounted directory which quotes by bracket "[]".
-get_bind_mount_directory()
+get_bind_mount_source()
 {
-    local _mntpoint=$(findmnt $1 | tail -n 1 | awk '{print $2}')
-    local _mntpoint_nofsroot=$(findmnt -v $1 | tail -n 1 | awk '{print $2}')
+    local _path=$1
+    # In case it's a sub path in a mount point, get the mount point first
+    local _mnt_top=$(df $_path | tail -1 | awk '{print $NF}')
+    local _mntpoint=$(findmnt $_mnt_top | tail -n 1 | awk '{print $2}')
+    local _mntpoint_nofsroot=$(findmnt -v $_mnt_top | tail -n 1 | awk '{print $2}')
+
+    if [[ "$_mntpoint" = $_mntpoint_nofsroot ]]; then
+        echo $_path && return
+    fi
 
     _mntpoint=${_mntpoint#*$_mntpoint_nofsroot}
-
     _mntpoint=${_mntpoint#[}
     _mntpoint=${_mntpoint%]}
+    _path=${_path#$_mnt_top}
 
-    echo $_mntpoint
+    echo $_mntpoint$_path
 }
 
-get_mntpoint_from_path() 
-{
-    echo $(df $1 | tail -1 |  awk '{print $NF}')
-}
-
+# Return the real underlaying device of a path, ignore bind mounts
 get_target_from_path()
 {
     local _target
@@ -236,64 +246,22 @@ get_target_from_path()
     echo $_target
 }
 
-get_fs_type_from_target() 
+get_fs_type_from_target()
 {
-    echo $(findmnt -k -f -n -r -o FSTYPE $1)
+    findmnt -k -f -n -r -o FSTYPE $1
 }
 
-# input: device path
-# output: the general mount point
-# find the general mount point, not the bind mounted point in atomic
-# As general system, Use the previous code
-#
-# ERROR and EXIT:
-# the device can be umounted the general mount point, if one of the mount point is bind mounted
-# For example:
-# mount /dev/sda /mnt/
-# mount -o bind /mnt/var /var
-# umount /mnt
+# Find the general mount point of a dump target, not the bind mount point
 get_mntpoint_from_target()
 {
-    if is_atomic; then
-        for _mnt in $(findmnt -k -n -r -o TARGET $1)
-        do
-            if ! is_bind_mount $_mnt; then
-                echo $_mnt
-                return
-            fi
-        done
-
-        echo "Mount $1 firstly, without the bind mode" >&2
-        exit 1
-    else
-        echo $(findmnt -k -f -n -r -o TARGET $1)
-    fi
+    # Expcilitly specify --source to findmnt could ensure non-bind mount is returned
+    findmnt -k -f -n -r -o TARGET --source $1
 }
 
 # get_option_value <option_name>
 # retrieves value of option defined in kdump.conf
 get_option_value() {
-    echo $(strip_comments `grep "^$1[[:space:]]\+" /etc/kdump.conf | tail -1 | cut -d\  -f2-`)
-}
-
-#This function compose a absolute path with the mount
-#point and the relative $SAVE_PATH.
-#target is passed in as argument, could be UUID, LABEL,
-#block device or even nfs server export of the form of
-#"my.server.com:/tmp/export"?
-#And possibly this could be used for both default case
-#as well as when dump taret is specified. When dump
-#target is not specified, then $target would be null.
-make_absolute_save_path()
-{
-    local _target=$1
-    local _mnt
-
-    [ -n $_target ] && _mnt=$(get_mntpoint_from_target $1)
-    _mnt="${_mnt}/$SAVE_PATH"
-
-    # strip the duplicated "/"
-    echo "$_mnt" | tr -s /
+    strip_comments `grep "^$1[[:space:]]\+" /etc/kdump.conf | tail -1 | cut -d\  -f2-`
 }
 
 check_save_path_fs()
@@ -303,6 +271,15 @@ check_save_path_fs()
     if [ ! -d $_path ]; then
         perror_exit "Dump path $_path does not exist."
     fi
+}
+
+# Check if path exists within dump target
+check_save_path_user_configured()
+{
+    local _target=$1 _path=$2
+    local _mnt=$(get_mntpoint_from_target $_target)
+
+    check_save_path_fs "$_mnt/$_path"
 }
 
 is_atomic()
@@ -581,35 +558,6 @@ need_64bit_headers()
     print (strtonum("0x" r[2]) > strtonum("0xffffffff")); }'`
 }
 
-# Check if secure boot is being enforced.
-#
-# Per Peter Jones, we need check efivar SecureBoot-$(the UUID) and
-# SetupMode-$(the UUID), they are both 5 bytes binary data. The first four
-# bytes are the attributes associated with the variable and can safely be
-# ignored, the last bytes are one-byte true-or-false variables. If SecureBoot
-# is 1 and SetupMode is 0, then secure boot is being enforced.
-#
-# Assume efivars is mounted at /sys/firmware/efi/efivars.
-is_secure_boot_enforced()
-{
-    local secure_boot_file setup_mode_file
-    local secure_boot_byte setup_mode_byte
-
-    secure_boot_file=$(find /sys/firmware/efi/efivars -name SecureBoot-* 2>/dev/null)
-    setup_mode_file=$(find /sys/firmware/efi/efivars -name SetupMode-* 2>/dev/null)
-
-    if [ -f "$secure_boot_file" ] && [ -f "$setup_mode_file" ]; then
-        secure_boot_byte=$(hexdump -v -e '/1 "%d\ "' $secure_boot_file|cut -d' ' -f 5)
-        setup_mode_byte=$(hexdump -v -e '/1 "%d\ "' $setup_mode_file|cut -d' ' -f 5)
-
-        if [ "$secure_boot_byte" = "1" ] && [ "$setup_mode_byte" = "0" ]; then
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
 #
 # prepare_kexec_args <kexec args>
 # This function prepares kexec argument.
@@ -659,7 +607,7 @@ check_boot_dir()
         kdump_bootdir="/boot"
     else
         eval $(cat /proc/cmdline| grep "BOOT_IMAGE" | cut -d' ' -f1)
-        kdump_bootdir="/boot"$(dirname $BOOT_IMAGE)
+        kdump_bootdir="/boot"$(dirname ${BOOT_IMAGE#*)})
     fi
     echo $kdump_bootdir
 }

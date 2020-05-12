@@ -6,7 +6,7 @@
 #  (at your option) any later version.
 
 # This service will run the real kdump error handler code. Executing the
-# default action configured in kdump.conf
+# failure action configured in kdump.conf
 
 [Unit]
 Description=Kdump Error Handler
@@ -21,7 +21,6 @@ Environment=DRACUT_SYSTEMD=1
 Environment=NEWROOT=/sysroot
 WorkingDirectory=/
 ExecStart=/bin/kdump-error-handler.sh
-ExecStopPost=-/usr/bin/systemctl --fail --no-block default
 Type=oneshot
 StandardInput=tty-force
 StandardOutput=inherit
