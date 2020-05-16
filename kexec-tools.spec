@@ -1,6 +1,6 @@
 Name: kexec-tools
 Version: 2.0.17
-Release: 15
+Release: 16
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -301,6 +301,12 @@ done
 %endif
 
 %changelog
+* Thu May 14 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.17-16
+- Type:enhancement
+- ID:NA
+- SUG:NA
+- DESC:fix kdump stuck
+
 * Wed Jan 1 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.17-15
 - Type:enhancement
 - ID:NA
