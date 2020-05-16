@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 11
+Release: 12
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -71,10 +71,10 @@ Requires:       systemd-udev%{?_isa}
 
 Patch6000: kexec-tools-2.0.20-fix-broken-multiboot2-buliding-for-i386.patch
 
-Patch6001: ./kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
-Patch6002: ./kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
-Patch6003: ./kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
-Patch6004: ./kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
+Patch6001: kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
+Patch6002: kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
+Patch6003: kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
+Patch6004: kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
 
 %ifarch aarch64
 Patch9000: arm64-support-more-than-one-crash-kernel-regions.patch
@@ -300,6 +300,12 @@ done
 %endif
 
 %changelog
+* Thu May 14 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.20-12
+- Type:enhancement
+- ID:NA
+- SUG:restart
+- DESC:fix kdump kernel stuck
+
 * Sun Apr 26 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.20-11
 - Type:enhancement
 - ID:NA
