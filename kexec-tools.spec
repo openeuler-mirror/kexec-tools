@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 12
+Release: 13
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -300,6 +300,12 @@ done
 %endif
 
 %changelog
+* Tue May 19 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.20-13
+- Type:enhancement
+- ID:NA
+- SUG:restart
+- DESC:fix kdump service failed on x86 because of KDUMP_FILE_LOAD is set to on
+
 * Thu May 14 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.20-12
 - Type:enhancement
 - ID:NA
