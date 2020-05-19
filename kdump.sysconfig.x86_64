@@ -43,4 +43,4 @@ KDUMP_IMG_EXT=""
 #
 # Here, the "on" is the only valid value to enable the kexec file load and
 # anything else is equal to the "off"(disable).
-KDUMP_FILE_LOAD="on"
+KDUMP_FILE_LOAD="off"
