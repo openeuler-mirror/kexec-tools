@@ -7,13 +7,13 @@ reason: get the paddr of mem_section return error address
 
 Signed-off-by: kangenbo <kangenbo@huawei.com>
 ---
- makedumpfile-1.6.4/arch/arm64.c | 4 ++--
+ makedumpfile-1.6.7/arch/arm64.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/makedumpfile-1.6.4/arch/arm64.c b/makedumpfile-1.6.4/arch/arm64.c
+diff --git a/makedumpfile-1.6.7/arch/arm64.c b/makedumpfile-1.6.7/arch/arm64.c
 index 2fd3e18..cc59e63 100644
---- a/makedumpfile-1.6.4/arch/arm64.c
-+++ b/makedumpfile-1.6.4/arch/arm64.c
+--- a/makedumpfile-1.6.7/arch/arm64.c
++++ b/makedumpfile-1.6.7/arch/arm64.c
 @@ -336,7 +336,7 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
  
  	if ((pud_val(pudv) & PUD_TYPE_MASK) == PUD_TYPE_SECT) {

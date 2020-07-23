@@ -197,45 +197,43 @@ index 2992bce..2bf8b66 100644
  /**
   * setup_2nd_dtb - Setup the 2nd stage kernel's dtb.
   */
-@@ -427,7 +455,7 @@ static int setup_2nd_dtb(struct dtb *dtb, char *command_line, int on_crash)
+@@ -428,7 +456,7 @@ static int setup_2nd_dtb(struct dtb *dtb, char *command_line, int on_crash)
+ 	int len, range_len;
  	int nodeoffset;
- 	char *new_buf = NULL;
  	int new_size;
--	int result;
-+	int i, result;
+-	int result, kaslr_seed;
++	int i, result, kaslr_seed;
  
  	result = fdt_check_header(dtb->buf);
  
-@@ -430,19 +430,21 @@ static int setup_2nd_dtb(struct dtb *dtb, char *command_line, int on_crash)
- 			goto on_error;
- 		}
+@@ -459,18 +487,21 @@ static int setup_2nd_dtb(struct dtb *dtb, char *command_line, int on_crash)
+ 		goto on_error;
+ 	}
  
--		if (!cells_size_fitted(address_cells, size_cells,
--					&crash_reserved_mem)) {
--			fprintf(stderr,
--				"kexec: usable memory range doesn't fit cells-size.\n");
--			result = -EINVAL;
--			goto on_error;
--		}
-+		for (i = 0; i < usablemem_rgns.size; i++) {
-+			if (!cells_size_fitted(address_cells, size_cells,
-+						&crash_reserved_mem[i])) {
-+				fprintf(stderr,
-+					"kexec: usable memory range doesn't fit cells-size.\n");
-+				result = -EINVAL;
-+				goto on_error;
-+			}
-+ 		}
+-	if (!cells_size_fitted(address_cells, size_cells,
+-				&crash_reserved_mem)) {
+-		fprintf(stderr, "kexec: usable memory range doesn't fit cells-size.\n");
+-		result = -EINVAL;
+-		goto on_error;
++	for (i = 0; i < usablemem_rgns.size; i++) {
++		if (!cells_size_fitted(address_cells, size_cells,
++					&crash_reserved_mem[i])) {
++			fprintf(stderr,
++				"kexec: usable memory range doesn't fit cells-size.\n");
++			result = -EINVAL;
++			goto on_error;
++		}
+ 	}
  
- 		/* duplicate dt blob */
- 		range_len = sizeof(uint32_t) * (address_cells + size_cells);
- 		new_size = fdt_totalsize(dtb->buf)
- 			+ fdt_prop_len(PROP_ELFCOREHDR, range_len)
--			+ fdt_prop_len(PROP_USABLE_MEM_RANGE, range_len);
-+			+ fdt_prop_len(PROP_USABLE_MEM_RANGE, range_len * usablemem_rgns.size);
+ 	/* duplicate dt blob */
+ 	range_len = sizeof(uint32_t) * (address_cells + size_cells);
+ 	new_size = fdt_totalsize(dtb->buf)
+ 		+ fdt_prop_len(PROP_ELFCOREHDR, range_len)
+-		+ fdt_prop_len(PROP_USABLE_MEM_RANGE, range_len);
++		+ fdt_prop_len(PROP_USABLE_MEM_RANGE, range_len * usablemem_rgns.size);
  
- 		new_buf = xmalloc(new_size);
- 		result = fdt_open_into(dtb->buf, new_buf, new_size);
+ 	new_buf = xmalloc(new_size);
+ 	result = fdt_open_into(dtb->buf, new_buf, new_size);
 @@ -565,8 +596,8 @@ static int setup_2nd_dtb(struct dtb *dtb, char *command_line, int on_crash)
  
  		/* add linux,usable-memory-range */

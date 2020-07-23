@@ -1,5 +1,4 @@
-SUBSYSTEM=="cpu", ACTION=="add", GOTO="kdump_reload"
-SUBSYSTEM=="cpu", ACTION=="remove", GOTO="kdump_reload"
+SUBSYSTEM=="cpu", ACTION=="online", GOTO="kdump_reload"
 SUBSYSTEM=="memory", ACTION=="online", GOTO="kdump_reload"
 SUBSYSTEM=="memory", ACTION=="offline", GOTO="kdump_reload"
 
