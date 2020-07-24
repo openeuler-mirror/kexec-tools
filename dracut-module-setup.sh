@@ -20,11 +20,27 @@ check() {
 depends() {
     local _dep="base shutdown"
 
+    is_squash_available() {
+        for kmodule in squashfs overlay loop; do
+            if [ -z "$KDUMP_KERNELVER" ]; then
+                modprobe --dry-run $kmodule &>/dev/null || return 1
+            else
+                modprobe -S $KDUMP_KERNELVER --dry-run $kmodule &>/dev/null || return 1
+            fi
+        done
+    }
+
+    if is_squash_available && ! is_fadump_capable; then
+        _dep="$_dep squash"
+    else
+        dwarning "Required modules to build a squashed kdump image is missing!"
+    fi
+
     if [ -n "$( find /sys/devices -name drm )" ] || [ -d /sys/module/hyperv_fb ]; then
         _dep="$_dep drm"
     fi
 
-    if is_generic_fence_kdump -o is_pcs_fence_kdump; then
+    if is_generic_fence_kdump || is_pcs_fence_kdump; then
         _dep="$_dep network"
     fi
 
@@ -126,7 +142,8 @@ kdump_static_ip() {
         echo -n "${_srcaddr}::${_gateway}:${_netmask}::"
     fi
 
-    /sbin/ip $_ipv6_flag route show | grep -v default | grep ".*via.* $_netdev " |\
+    /sbin/ip $_ipv6_flag route show | grep -v default |\
+    grep ".*via.* $_netdev " | grep -v "^[[:space:]]*nexthop" |\
     while read _route; do
         _target=`echo $_route | cut -d ' ' -f1`
         _nexthop=`echo $_route | cut -d ' ' -f3`
@@ -136,6 +153,44 @@ kdump_static_ip() {
         fi
         echo "rd.route=$_target:$_nexthop:$_netdev"
     done >> ${initdir}/etc/cmdline.d/45route-static.conf
+
+    kdump_handle_mulitpath_route $_netdev $_srcaddr
+}
+
+kdump_handle_mulitpath_route() {
+    local _netdev="$1" _srcaddr="$2" _ipv6_flag
+    local _target _nexthop _route _weight _max_weight _rule
+
+    if is_ipv6_address $_srcaddr; then
+        _ipv6_flag="-6"
+    fi
+
+    while IFS="" read _route; do
+        if [[ "$_route" =~ [[:space:]]+nexthop ]]; then
+            _route=$(echo "$_route" | sed -e 's/^[[:space:]]*//')
+            # Parse multipath route, using previous _target
+            [[ "$_target" == 'default' ]] && continue
+            [[ "$_route" =~ .*via.*\ $_netdev ]] || continue
+
+            _weight=`echo "$_route" | cut -d ' ' -f7`
+            if [[ "$_weight" -gt "$_max_weight" ]]; then
+                _nexthop=`echo "$_route" | cut -d ' ' -f3`
+                _max_weight=$_weight
+                if [ "x" !=  "x"$_ipv6_flag ]; then
+                    _rule="rd.route=[$_target]:[$_nexthop]:$_netdev"
+                else
+                    _rule="rd.route=$_target:$_nexthop:$_netdev"
+                fi
+            fi
+        else
+            [[ -n "$_rule" ]] && echo "$_rule"
+            _target=`echo "$_route" | cut -d ' ' -f1`
+            _rule="" _max_weight=0 _weight=0
+        fi
+    done >> ${initdir}/etc/cmdline.d/45route-static.conf\
+        <<< "$(/sbin/ip $_ipv6_flag route show)"
+
+    [[ -n $_rule ]] && echo $_rule >> ${initdir}/etc/cmdline.d/45route-static.conf
 }
 
 kdump_get_mac_addr() {
@@ -209,7 +264,7 @@ kdump_setup_bond() {
 
     source_ifcfg_file $_netdev
 
-    bondoptions="$(echo :$BONDING_OPTS | sed 's/\s\+/,/')"
+    bondoptions=":$(echo $BONDING_OPTS | xargs echo | tr " " ",")"
     echo "$bondoptions" >> ${initdir}/etc/cmdline.d/42bond.conf
 }
 
@@ -252,10 +307,10 @@ kdump_setup_vlan() {
         exit 1
     elif kdump_is_bond "$_phydev"; then
         kdump_setup_bond "$_phydev"
-        echo " vlan=$_netdev:$_phydev" > ${initdir}/etc/cmdline.d/43vlan.conf
+        echo " vlan=$(kdump_setup_ifname $_netdev):$_phydev" > ${initdir}/etc/cmdline.d/43vlan.conf
     else
         _kdumpdev="$(kdump_setup_ifname $_phydev)"
-        echo " vlan=$_netdev:$_kdumpdev ifname=$_kdumpdev:$_netmac" > ${initdir}/etc/cmdline.d/43vlan.conf
+        echo " vlan=$(kdump_setup_ifname $_netdev):$_kdumpdev ifname=$_kdumpdev:$_netmac" > ${initdir}/etc/cmdline.d/43vlan.conf
     fi
 }
 
@@ -272,11 +327,45 @@ kdump_setup_znet() {
     echo rd.znet=${NETTYPE},${SUBCHANNELS}${_options} > ${initdir}/etc/cmdline.d/30znet.conf
 }
 
-# Setup dracut to bringup a given network interface
-kdump_setup_netdev() {
-    local _netdev=$1 _srcaddr=$2
+kdump_get_ip_route()
+{
+    local _route=$(/sbin/ip -o route get to $1 2>&1)
+    [ $? != 0 ] && die "Bad kdump network destination: $1"
+    echo $_route
+}
+
+kdump_get_ip_route_field()
+{
+    if `echo $1 | grep -q $2`; then
+        echo ${1##*$2} | cut -d ' ' -f1
+    fi
+}
+
+kdump_get_remote_ip()
+{
+    local _remote=$(get_remote_host $1) _remote_temp
+    if is_hostname $_remote; then
+        _remote_temp=`getent ahosts $_remote | grep -v : | head -n 1`
+        if [ -z "$_remote_temp" ]; then
+            _remote_temp=`getent ahosts $_remote | head -n 1`
+        fi
+        _remote=`echo $_remote_temp | cut -d' ' -f1`
+    fi
+    echo $_remote
+}
+
+# Setup dracut to bring up network interface that enable
+# initramfs accessing giving destination
+# $1: destination host
+kdump_install_net() {
+    local _destaddr _srcaddr _route _netdev
     local _static _proto _ip_conf _ip_opts _ifname_opts
-    local _netmac=$(kdump_get_mac_addr $_netdev)
+
+    _destaddr=$(kdump_get_remote_ip $1)
+    _route=$(kdump_get_ip_route $_destaddr)
+    _srcaddr=$(kdump_get_ip_route_field "$_route" "src")
+    _netdev=$(kdump_get_ip_route_field "$_route" "dev")
+    _netmac=$(kdump_get_mac_addr $_netdev)
 
     if [ "$(uname -m)" = "s390x" ]; then
         kdump_setup_znet $_netdev
@@ -317,42 +406,8 @@ kdump_setup_netdev() {
     fi
 
     kdump_setup_dns "$_netdev"
-}
 
-get_ip_route_field()
-{
-    if `echo $1 | grep -q $2`; then
-        echo ${1##*$2} | cut -d ' ' -f1
-    fi
-}
-
-#Function:kdump_install_net
-#$1: config values of net line in kdump.conf
-#$2: srcaddr of network device
-kdump_install_net() {
-    local _server _netdev _srcaddr _route _serv_tmp
-    local config_val="$1"
-
-    _server=$(get_remote_host $config_val)
-
-    if is_hostname $_server; then
-        _serv_tmp=`getent ahosts $_server | grep -v : | head -n 1`
-        if [ -z "$_serv_tmp" ]; then
-            _serv_tmp=`getent ahosts $_server | head -n 1`
-        fi
-        _server=`echo $_serv_tmp | cut -d' ' -f1`
-    fi
-
-    _route=`/sbin/ip -o route get to $_server 2>&1`
-    [ $? != 0 ] && echo "Bad kdump location: $config_val" && exit 1
-
-    #the field in the ip output changes if we go to another subnet
-    _srcaddr=$(get_ip_route_field "$_route" "src")
-    _netdev=$(get_ip_route_field "$_route" "dev")
-
-    kdump_setup_netdev "${_netdev}" "${_srcaddr}"
-
-    #save netdev used for kdump as cmdline
+    # Save netdev used for kdump as cmdline
     # Whoever calling kdump_install_net() is setting up the default gateway,
     # ie. bootdev/kdumpnic. So don't override the setting if calling
     # kdump_install_net() for another time. For example, after setting eth0 as
@@ -373,24 +428,9 @@ default_dump_target_install_conf()
 
     is_user_configured_dump_target && return
 
-    _save_path=$(get_option_value "path")
-    [ -z "$_save_path" ] && _save_path=$DEFAULT_PATH
-
-    # strip the duplicated "/"
-    _save_path=$(echo $_save_path | tr -s /)
-
-    _mntpoint=$(get_mntpoint_from_path $_save_path)
+    _save_path=$(get_bind_mount_source $(get_save_path))
     _target=$(get_target_from_path $_save_path)
-
-    if is_atomic && is_bind_mount $_mntpoint; then
-        _save_path=${_save_path##"$_mntpoint"}
-        # the real dump path in the 2nd kernel, if the mount point is bind mounted.
-        _save_path=$(get_bind_mount_directory $_mntpoint)/$_save_path
-        _mntpoint=$(get_mntpoint_from_target $_target)
-
-        # the absolute path in the 1st kernel
-        _save_path=$_mntpoint/$_save_path
-    fi
+    _mntpoint=$(get_mntpoint_from_target $_target)
 
     _fstype=$(get_fs_type_from_target $_target)
     if is_fs_type_nfs $_fstype; then
@@ -402,8 +442,6 @@ default_dump_target_install_conf()
 
     echo "$_fstype $_target" >> ${initdir}/tmp/$$-kdump.conf
 
-    # strip the duplicated "/"
-    _save_path=$(echo $_save_path | tr -s /)
     # don't touch the path under root mount
     if [ "$_mntpoint" != "/" ]; then
         _save_path=${_save_path##"$_mntpoint"}
@@ -414,39 +452,14 @@ default_dump_target_install_conf()
     echo "path $_save_path" >> ${initdir}/tmp/$$-kdump.conf
 }
 
-adjust_bind_mount_path()
-{
-    local _target=$1
-    local _save_path=$(get_option_value "path")
-    [ -z "$_save_path" ] && _save_path=$DEFAULT_PATH
-
-    # strip the duplicated "/"
-    _save_path=$(echo $_save_path | tr -s /)
-
-    local _absolute_save_path=$(get_mntpoint_from_target $_target)/$_save_path
-    _absolute_save_path=$(echo "$_absolute_save_path" | tr -s /)
-    local _mntpoint=$(get_mntpoint_from_path $_absolute_save_path)
-
-    if is_bind_mount $_mntpoint; then
-        _save_path=${_absolute_save_path##"$_mntpoint"}
-        # the real dump path in the 2nd kernel, if the mount point is bind mounted.
-        _save_path=$(get_bind_mount_directory $_mntpoint)/$_save_path
-
-        #erase the old path line, then insert the parsed path
-        sed -i "/^path/d" ${initdir}/tmp/$$-kdump.conf
-        echo "path $_save_path" >> ${initdir}/tmp/$$-kdump.conf
-    fi
-}
-
 #install kdump.conf and what user specifies in kdump.conf
 kdump_install_conf() {
     local _opt _val _pdev
-    sed -ne '/^#/!p' /etc/kdump.conf > ${initdir}/tmp/$$-kdump.conf
+    (read_strip_comments /etc/kdump.conf) > ${initdir}/tmp/$$-kdump.conf
 
     while read _opt _val;
     do
         # remove inline comments after the end of a directive.
-        _val=$(strip_comments $_val)
         case "$_opt" in
         raw)
             _pdev=$(persistent_policy="by-id" kdump_get_persistent_dev $_val)
@@ -455,9 +468,6 @@ kdump_install_conf() {
         ext[234]|xfs|btrfs|minix)
             _pdev=$(kdump_get_persistent_dev $_val)
             sed -i -e "s#^$_opt[[:space:]]\+$_val#$_opt $_pdev#" ${initdir}/tmp/$$-kdump.conf
-            if is_atomic; then
-                adjust_bind_mount_path "$_val"
-            fi
             ;;
         ssh|nfs)
             kdump_install_net "$_val"
@@ -474,7 +484,7 @@ kdump_install_conf() {
             dracut_install "${_val%%[[:blank:]]*}"
             ;;
         esac
-    done < /etc/kdump.conf
+    done <<< "$(read_strip_comments /etc/kdump.conf)"
 
     default_dump_target_install_conf
 
@@ -483,16 +493,18 @@ kdump_install_conf() {
     rm -f ${initdir}/tmp/$$-kdump.conf
 }
 
-# Default sysctl parameters should suffice for kdump kernel.
-# Remove custom configurations sysctl.conf & sysctl.d/*
-remove_sysctl_conf() {
-
+# Remove user custom configurations sysctl.conf & sysctl.d/*
+# and apply some optimization for kdump
+overwrite_sysctl_conf() {
     # As custom configurations like vm.min_free_kbytes can lead
     # to OOM issues in kdump kernel, avoid them
     rm -f "${initdir}/etc/sysctl.conf"
     rm -rf "${initdir}/etc/sysctl.d"
     rm -rf "${initdir}/run/sysctl.d"
     rm -rf "${initdir}/usr/lib/sysctl.d"
+
+    mkdir -p "${initdir}/etc/sysctl.d"
+    echo "vm.zone_reclaim_mode = 3" > "${initdir}/etc/sysctl.d/99-zone-reclaim.conf"
 }
 
 kdump_iscsi_get_rec_val() {
@@ -538,9 +550,6 @@ kdump_setup_iscsi_device() {
     local tgt_name; local tgt_ipaddr;
     local username; local password; local userpwd_str;
     local username_in; local password_in; local userpwd_in_str;
-    local netdev
-    local srcaddr
-    local idev
     local netroot_str ; local initiator_str;
     local netroot_conf="${initdir}/etc/cmdline.d/50iscsi.conf"
     local initiator_conf="/etc/iscsi/initiatorname.iscsi"
@@ -579,12 +588,7 @@ kdump_setup_iscsi_device() {
 
     [ -n "$username_in" ] && userpwd_in_str=":$username_in:$password_in"
 
-    netdev=$(/sbin/ip route get to ${tgt_ipaddr} | \
-        sed 's|.*dev \(.*\).*|\1|g')
-    srcaddr=$(echo $netdev | awk '{ print $3; exit }')
-    netdev=$(echo $netdev | awk '{ print $1; exit }')
-
-    kdump_setup_netdev $netdev $srcaddr
+    kdump_install_net "$tgt_ipaddr"
 
     # prepare netroot= command line
     # FIXME: Do we need to parse and set other parameters like protocol, port
@@ -635,6 +639,41 @@ kdump_check_iscsi_targets () {
     }
 }
 
+# hostname -a is deprecated, do it by ourself
+get_alias() {
+    local ips
+    local entries
+    local alias_set
+
+    ips=$(hostname -I)
+    for ip in $ips
+    do
+            # in /etc/hosts, alias can come at the 2nd column
+            entries=$(grep $ip /etc/hosts | awk '{ $1=""; print $0 }')
+            if [ $? -eq 0 ]; then
+                    alias_set="$alias_set $entries"
+            fi
+    done
+
+    echo $alias_set
+}
+
+is_localhost() {
+    local hostnames=$(hostname -A)
+    local shortnames=$(hostname -A -s)
+    local aliasname=$(get_alias)
+    local nodename=$1
+
+    hostnames="$hostnames $shortnames $aliasname"
+
+    for name in ${hostnames}; do
+        if [ "$name" == "$nodename" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # retrieves fence_kdump nodes from Pacemaker cluster configuration
 get_pcs_fence_kdump_nodes() {
     local nodes
@@ -649,7 +688,7 @@ get_pcs_fence_kdump_nodes() {
         eval $node
         nodename=$uname
         # Skip its own node name
-        if [ "$nodename" = `hostname` -o "$nodename" = `hostname -s` ]; then
+        if is_localhost $nodename; then
             continue
         fi
         nodes="$nodes $nodename"
@@ -666,6 +705,21 @@ get_pcs_fence_kdump_args() {
     fi
 }
 
+get_generic_fence_kdump_nodes() {
+    local filtered
+    local nodes
+
+    nodes=$(get_option_value "fence_kdump_nodes")
+    for node in ${nodes}; do
+        # Skip its own node name
+        if is_localhost $node; then
+            continue
+        fi
+        filtered="$filtered $node"
+    done
+    echo $filtered
+}
+
 # setup fence_kdump in cluster
 # setup proper network and install needed files
 kdump_configure_fence_kdump () {
@@ -674,7 +728,7 @@ kdump_configure_fence_kdump () {
     local args
 
     if is_generic_fence_kdump; then
-        nodes=$(get_option_value "fence_kdump_nodes")
+        nodes=$(get_generic_fence_kdump_nodes)
 
     elif is_pcs_fence_kdump; then
         nodes=$(get_pcs_fence_kdump_nodes)
@@ -717,7 +771,7 @@ kdump_install_random_seed() {
 
 install() {
     kdump_install_conf
-    remove_sysctl_conf
+    overwrite_sysctl_conf
 
     if is_ssh_dump_target; then
         kdump_install_random_seed
@@ -731,12 +785,15 @@ install() {
     inst "/bin/sync" "/bin/sync"
     inst "/bin/cut" "/bin/cut"
     inst "/bin/head" "/bin/head"
+    inst "/bin/awk" "/bin/awk"
+    inst "/bin/sed" "/bin/sed"
     inst "/sbin/makedumpfile" "/sbin/makedumpfile"
     inst "/sbin/vmcore-dmesg" "/sbin/vmcore-dmesg"
     inst "/lib/kdump/kdump-lib.sh" "/lib/kdump-lib.sh"
     inst "/lib/kdump/kdump-lib-initramfs.sh" "/lib/kdump-lib-initramfs.sh"
     inst "$moddir/kdump.sh" "/usr/bin/kdump.sh"
     inst "$moddir/kdump-capture.service" "$systemdsystemunitdir/kdump-capture.service"
+    mkdir -p "$initdir/$systemdsystemunitdir/initrd.target.wants"
     ln_r "$systemdsystemunitdir/kdump-capture.service" "$systemdsystemunitdir/initrd.target.wants/kdump-capture.service"
     inst "$moddir/kdump-error-handler.sh" "/usr/bin/kdump-error-handler.sh"
     inst "$moddir/kdump-error-handler.service" "$systemdsystemunitdir/kdump-error-handler.service"
@@ -750,6 +807,13 @@ install() {
     # target. Ideally all this should be pushed into dracut iscsi module
     # at some point of time.
     kdump_check_iscsi_targets
+
+    # nfs/ssh dump will need to get host ip in second kernel and need to call 'ip' tool, see get_host_ip for more detail
+    # also need to let initqueue wait for target to become ready
+    if is_nfs_dump_target || is_ssh_dump_target; then
+        inst_hook initqueue/finished 01 $moddir/kdump-wait-for-target.sh
+        inst "ip"
+    fi
 
     # For the lvm type target under kdump, in /etc/lvm/lvm.conf we can
     # safely replace "reserved_memory=XXXX"(default value is 8192) with
@@ -767,5 +831,15 @@ install() {
         mkdir -p ${initdir}/etc/systemd/system.conf.d
         echo "[Manager]" > ${initdir}/etc/systemd/system.conf.d/kdump.conf
         echo "DefaultTimeoutStartSec=300s" >> ${initdir}/etc/systemd/system.conf.d/kdump.conf
+    fi
+
+    # Forward logs to console directly, this avoids unneccessary memory
+    # consumption and make console output more useful.
+    # Only do so for non fadump image.
+    if ! is_fadump_capable; then
+        mkdir -p ${initdir}/etc/systemd/journald.conf.d
+        echo "[Journal]" > ${initdir}/etc/systemd/journald.conf.d/kdump.conf
+        echo "Storage=none" >> ${initdir}/etc/systemd/journald.conf.d/kdump.conf
+        echo "ForwardToConsole=yes" >> ${initdir}/etc/systemd/journald.conf.d/kdump.conf
     fi
 }
