@@ -341,7 +341,7 @@ done
   kexec/kexec-zlib.h: Add 'is_zlib_file()' helper function
   kexec/arm64: Add support for handling zlib compressed (Image.gz) image
 
-* Thu Sep 21 2019 openEuler Buildteam <buildteam@openeuler.org> - 2.0-17.11
+* Sat Sep 21 2019 openEuler Buildteam <buildteam@openeuler.org> - 2.0-17.11
 - Package init
 
 * Thu Aug 22 2019 Yeqing Peng<pengyeqing@huawei.com> - 2.0-17.10.h1
