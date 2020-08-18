@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 1
+Release: 2
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -55,7 +55,7 @@ Requires: dracut >= 047-34.git20180604
 Requires: dracut-network >= 044-117
 Requires: dracut-squash >= 049-4
 Requires: ethtool
-BuildRequires: zlib-devel zlib zlib-static elfutils-devel-static glib2-devel bzip2-devel ncurses-devel bison flex lzo-devel snappy-devel
+BuildRequires: zlib-devel elfutils-devel-static glib2-devel bzip2-devel ncurses-devel bison flex lzo-devel snappy-devel
 BuildRequires: pkgconfig intltool gettext
 BuildRequires: systemd-units
 BuildRequires: automake autoconf libtool
@@ -84,6 +84,10 @@ Patch9001: add-secure-compile-options-for-makedumpfile.patch
 
 Patch9002: bugfix-get-the-paddr-of-mem_section-return-error-address.patch
 Patch9003: fix-header-offset-overflow-when-large-pfn.patch
+Patch9004: kexec-Add-quick-kexec-support.patch
+%ifarch aarch64
+Patch9005: kexec-Quick-kexec-implementation-for-arm64.patch
+%endif
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -115,6 +119,11 @@ tar -z -x -v -f %{SOURCE19}
 %patch9001 -p1
 %patch9002 -p1
 %patch9003 -p1
+%patch9004 -p1
+%ifarch aarch64
+%patch9005 -p1
+%endif
+
 
 %build
 autoreconf
@@ -300,6 +309,11 @@ done
 %endif
 
 %changelog
+* Thu Aug 13 2020 snoweay <snoweay@163.com> - 2.0.20-2
+- Add support for quick kexec
+  kexec: Add quick kexec support
+  arm64: Quick kexec implementation for arm64
+
 * Thu Jul 23 2020 zhangxingliang <zhangxingliang3@huawei.com> - 2.0.20-1
 - Type:update
 - ID:NA
@@ -341,7 +355,7 @@ done
   kexec/kexec-zlib.h: Add 'is_zlib_file()' helper function
   kexec/arm64: Add support for handling zlib compressed (Image.gz) image
 
-* Thu Sep 21 2019 openEuler Buildteam <buildteam@openeuler.org> - 2.0-17.11
+* Sat Sep 21 2019 openEuler Buildteam <buildteam@openeuler.org> - 2.0-17.11
 - Package init
 
 * Thu Aug 22 2019 Yeqing Peng<pengyeqing@huawei.com> - 2.0-17.10.h1
