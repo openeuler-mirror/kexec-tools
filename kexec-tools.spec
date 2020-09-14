@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 3
+Release: 4
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -70,26 +70,36 @@ Requires:       systemd-udev%{?_isa}
 %undefine _hardened_build
 
 Patch0: kexec-tools-2.0.20-fix-broken-multiboot2-buliding-for-i386.patch
-
 Patch1: kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
 Patch2: kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
 Patch3: kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
 Patch4: kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
-
 Patch5: kexec-add-variant-helper-functions-for-handling-memory-regions.patch
 Patch6: arm64-kexec-allocate-memory-space-avoiding-reserved-regions.patch
 
+Patch7: x86-Fix-PAGE_OFFSET-for-kernels-since-4.20.patch
+Patch8: Cleanup-remove-the-read_elf_kcore.patch
+Patch9: Fix-an-error-definition-about-the-variable-fname.patch
+Patch10: Cleanup-move-it-back-from-util_lib-elf_info.c.patch
+Patch11: Limit-the-size-of-vmcore-dmesg.txt-to-2G.patch
+Patch12: vmcore-dmesg-vmcore-dmesg.c-Fix-shifting-error-reported-by-cppcheck.patch
+Patch13: kexec-tools-Fix-possible-out-of-bounds-access-in-ifdown.patch
+Patch14: kexec-tools-Fix-kexec_file_load-2-error-handling.patch
+Patch15: kexec-tools-Reset-getopt-before-falling-back-to-legacy.patch
+Patch16: kexec-support-parsing-the-string-Reserved-to-get-the-correct-e820-reserved-region.patch
+Patch17: arm64-kdump-deal-with-a-lot-of-resource-entries-in-proc-iomem.patch
+
 %ifarch aarch64
-Patch7: arm64-support-more-than-one-crash-kernel-regions.patch
+Patch18: arm64-support-more-than-one-crash-kernel-regions.patch
 %endif
 
-Patch8: add-secure-compile-options-for-makedumpfile.patch
+Patch19: add-secure-compile-options-for-makedumpfile.patch
+Patch20:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
+Patch21: fix-header-offset-overflow-when-large-pfn.patch
+Patch22: kexec-Add-quick-kexec-support.patch
 
-Patch9:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
-Patch10: fix-header-offset-overflow-when-large-pfn.patch
-Patch11: kexec-Add-quick-kexec-support.patch
 %ifarch aarch64
-Patch12: kexec-Quick-kexec-implementation-for-arm64.patch
+Patch23: kexec-Quick-kexec-implementation-for-arm64.patch
 %endif
 
 %description
@@ -120,19 +130,30 @@ tar -z -x -v -f %{SOURCE19}
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
-
-%ifarch aarch64
 %patch7 -p1
-%endif
-
 %patch8 -p1
 %patch9 -p1
 %patch10 -p1
 %patch11 -p1
-%ifarch aarch64
 %patch12 -p1
+%patch13 -p1
+%patch14 -p1
+%patch15 -p1
+%patch16 -p1
+%patch17 -p1
+
+%ifarch aarch64
+%patch18 -p1
 %endif
 
+%patch19 -p1
+%patch20 -p1
+%patch21 -p1
+%patch22 -p1
+
+%ifarch aarch64
+%patch23 -p1
+%endif
 
 %build
 autoreconf
@@ -318,7 +339,13 @@ done
 %endif
 
 %changelog
-* Thu Sep 10 2020 zhangruifang2020 <xdzhangruifang@163.com> - 2.0.20-3
+* Mon Sep 14 2020 zhangruifang2020 <zhangruifang1@huawei.com> - 2.0.20-4
+- Type:enhancement
+- ID:NA
+- SUG:NA
+- DESC:sychronize git patches to enhance quality
+
+* Thu Sep 10 2020 zhangruifang2020 <zhangruifang1@huawei.com> - 2.0.20-3
 - Type:bugfix
 - ID:NA
 - SUG:NA
