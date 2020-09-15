@@ -1,0 +1,44 @@
+From 23b67f048ddef88e59ffe40f6392aeef92af9066 Mon Sep 17 00:00:00 2001
+From: Donald Buczek <buczek@molgen.mpg.de>
+Date: Fri, 30 Aug 2019 11:12:58 +0200
+Subject: [PATCH] x86: Fix PAGE_OFFSET for kernels since 4.20
+
+Linux kernel commit d52888aa2753 ("x86/mm: Move LDT remap out of KASLR
+region on 5-level paging") changed the base of the direct mapping
+from 0xffff880000000000 to 0xffff888000000000. This was merged
+into v4.20-rc2.
+
+Update to new address accordingly.
+
+Signed-off-by: Simon Horman <horms@verge.net.au>
+
+diff --git a/kexec/arch/i386/crashdump-x86.c b/kexec/arch/i386/crashdump-x86.c
+index a2aea31..c79791f 100644
+--- a/kexec/arch/i386/crashdump-x86.c
++++ b/kexec/arch/i386/crashdump-x86.c
+@@ -61,6 +61,8 @@ static int get_kernel_page_offset(struct kexec_info *UNUSED(info),
+ 
+ 		if (kv < KERNEL_VERSION(2, 6, 27))
+ 			elf_info->page_offset = X86_64_PAGE_OFFSET_PRE_2_6_27;
++		else if (kv < KERNEL_VERSION(4, 20, 0))
++			elf_info->page_offset = X86_64_PAGE_OFFSET_PRE_4_20_0;
+ 		else
+ 			elf_info->page_offset = X86_64_PAGE_OFFSET;
+ 	}
+diff --git a/kexec/arch/i386/crashdump-x86.h b/kexec/arch/i386/crashdump-x86.h
+index ddee19f..e4fdc82 100644
+--- a/kexec/arch/i386/crashdump-x86.h
++++ b/kexec/arch/i386/crashdump-x86.h
+@@ -13,7 +13,8 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline,
+ 
+ #define X86_64__START_KERNEL_map	0xffffffff80000000ULL
+ #define X86_64_PAGE_OFFSET_PRE_2_6_27	0xffff810000000000ULL
+-#define X86_64_PAGE_OFFSET		0xffff880000000000ULL
++#define X86_64_PAGE_OFFSET_PRE_4_20_0	0xffff880000000000ULL
++#define X86_64_PAGE_OFFSET	0xffff888000000000ULL
+ 
+ #define X86_64_MAXMEM        		0x3fffffffffffUL
+ 
+-- 
+1.8.3.1
+
