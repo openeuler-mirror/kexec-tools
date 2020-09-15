@@ -30,9 +30,9 @@ diff --git a/kexec/arch/arm64/crashdump-arm64.c b/kexec/arch/arm64/crashdump-arm
 index 4fd7aa8..158e778 100644
 --- a/kexec/arch/arm64/crashdump-arm64.c
 +++ b/kexec/arch/arm64/crashdump-arm64.c
-@@ -32,11 +32,11 @@ static struct memory_ranges system_memory_rgns = {
- };
- 
+@@ -27,11 +27,11 @@
+ static struct memory_ranges system_memory_rgns;
+
  /* memory range reserved for crashkernel */
 -struct memory_range crash_reserved_mem;
 +struct memory_range crash_reserved_mem[CRASH_MAX_RESERVED_RANGES];
@@ -63,7 +63,7 @@ index 4fd7aa8..158e778 100644
  	/*
  	 * First read all memory regions that can be considered as
  	 * system memory including the crash area.
-@@ -129,16 +131,19 @@ static int crash_get_memory_ranges(void)
+@@ -124,16 +126,19 @@ static int crash_get_memory_ranges(void)
  	if (!usablemem_rgns.size)
  		kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
  
@@ -77,9 +77,9 @@ index 4fd7aa8..158e778 100644
 +	dbgprint_mem_range("Reserved memory range",
 +			usablemem_rgns.ranges, usablemem_rgns.size);
  
--	if (mem_regions_exclude(&system_memory_rgns, &crash_reserved_mem)) {
--		fprintf(stderr,
--			"Error: Number of crash memory ranges excedeed the max limit\n");
+-	if (mem_regions_alloc_and_exclude(&system_memory_rgns,
+-						&crash_reserved_mem)) {
+-		fprintf(stderr, "Cannot allocate memory for ranges\n");
 -		return -ENOMEM;
 +	for (i = 0; i < usablemem_rgns.size; i++) {
 +		if (mem_regions_exclude(&system_memory_rgns, &crash_reserved_mem[i])) {
