@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 13
+Release: 14
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -69,21 +69,22 @@ Requires:       systemd-udev%{?_isa}
 
 %undefine _hardened_build
 
-Patch6000: kexec-tools-2.0.20-fix-broken-multiboot2-buliding-for-i386.patch
-
-Patch6001: kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
-Patch6002: kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
-Patch6003: kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
-Patch6004: kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
+Patch0:  kexec-tools-2.0.20-fix-broken-multiboot2-buliding-for-i386.patch
+Patch1:  kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
+Patch2:  kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
+Patch3:  kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
+Patch4:  kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
+Patch5:  kexec-add-variant-helper-functions-for-handling-memory-regions.patch
+Patch6:  arm64-kexec-allocate-memory-space-avoiding-reserved-regions.patch
 
 %ifarch aarch64
-Patch9000: arm64-support-more-than-one-crash-kernel-regions.patch
+Patch7:  arm64-support-more-than-one-crash-kernel-regions.patch
 %endif
 
-Patch9001: add-secure-compile-options-for-makedumpfile.patch
+Patch8:  add-secure-compile-options-for-makedumpfile.patch
 
-Patch9002: bugfix-get-the-paddr-of-mem_section-return-error-address.patch
-Patch9003: fix-header-offset-overflow-when-large-pfn.patch
+Patch9:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
+Patch10: fix-header-offset-overflow-when-large-pfn.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -106,15 +107,20 @@ mkdir -p -m755 kcp
 tar -z -x -v -f %{SOURCE9}
 tar -z -x -v -f %{SOURCE19}
 
-%{lua:for i=0,4 do print(string.format("%%patch600%u -p1\n", i)) end}
-
+%patch0  -p1
+%patch1  -p1
+%patch2  -p1
+%patch3  -p1
+%patch4  -p1
+%patch5  -p1
+%patch6  -p1
 %ifarch aarch64
-%patch9000 -p1
+%patch7  -p1
 %endif
 
-%patch9001 -p1
-%patch9002 -p1
-%patch9003 -p1
+%patch8  -p1
+%patch9  -p1
+%patch10 -p1
 
 %build
 autoreconf
@@ -300,6 +306,12 @@ done
 %endif
 
 %changelog
+* Fri Nov 27 2020 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-14
+- Type:bugfix
+- ID:NA
+- SUG:NA
+- DESC:fix issue about iomem file that contains too many contens.As a result,the kdump service failed
+
 * Tue May 19 2020 openEuler Buildteam <buildteam@openeuler.org> - 2.0.20-13
 - Type:enhancement
 - ID:NA
