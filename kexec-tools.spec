@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 5
+Release: 6
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -339,6 +339,9 @@ done
 %endif
 
 %changelog
+* Mon Mar 22 2021 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-6
+- support more than one crash kernel regions
+
 * Mon Mar 1 2021 snoweay <snoweay@163.com> - 2.0.20-5
 - Fix bugs of unuseable quick kexec on arm64, becaues of
   arm64-kexec-allocate-memory-space-avoiding-reserved-regions excluding QUICK_KEXEC memory region.

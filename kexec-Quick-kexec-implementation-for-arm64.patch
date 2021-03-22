@@ -13,14 +13,14 @@ Locate kernel segments from reserved memory of range "Quick kexec".
  3 files changed, 41 insertions(+), 13 deletions(-)
 
 diff --git a/kexec/arch/arm64/iomem.h b/kexec/arch/arm64/iomem.h
-index d4864bb..108871e 100644
+index 45d7953..f283f50 100644
 --- a/kexec/arch/arm64/iomem.h
 +++ b/kexec/arch/arm64/iomem.h
-@@ -6,5 +6,6 @@
- #define KERNEL_DATA		"Kernel data\n"
+@@ -7,5 +7,6 @@
+ #define CRASH_KERNEL_LOW	"Crash kernel (low)\n"
  #define CRASH_KERNEL		"Crash kernel\n"
  #define IOMEM_RESERVED		"reserved\n"
-+#define QUICK_KEXEC     	"Quick kexec\n"
++#define QUICK_KEXEC             "Quick kexec\n"
  
  #endif
 diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
