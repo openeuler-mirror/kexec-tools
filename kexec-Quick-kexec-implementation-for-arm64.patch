@@ -1,4 +1,4 @@
-From 7d404ff2549cb9d6d94ec38cee8712cf2feeb39e Mon Sep 17 00:00:00 2001
+From 5a302cd06079a285cb24a74c0f60b26866ae4e4d Mon Sep 17 00:00:00 2001
 From: snoweay <snoweay@163.com>
 Date: Wed, 12 Aug 2020 07:59:06 -0400
 Subject: [PATCH] kexec: Quick kexec implementation for arm64
@@ -8,26 +8,26 @@ Implement quick kexec on arch/arm64.
 Locate kernel segments from reserved memory of range "Quick kexec".
 ---
  kexec/arch/arm64/iomem.h             |  1 +
- kexec/arch/arm64/kexec-arm64.c       | 39 +++++++++++++++++++---------
- kexec/arch/arm64/kexec-image-arm64.c | 11 ++++++++
- 3 files changed, 39 insertions(+), 12 deletions(-)
+ kexec/arch/arm64/kexec-arm64.c       | 42 +++++++++++++++++++++++++-----------
+ kexec/arch/arm64/kexec-image-arm64.c | 11 ++++++++++
+ 3 files changed, 41 insertions(+), 13 deletions(-)
 
 diff --git a/kexec/arch/arm64/iomem.h b/kexec/arch/arm64/iomem.h
-index d4864bb..108871e 100644
+index 45d7953..f283f50 100644
 --- a/kexec/arch/arm64/iomem.h
 +++ b/kexec/arch/arm64/iomem.h
-@@ -6,5 +6,6 @@
- #define KERNEL_DATA		"Kernel data\n"
+@@ -7,5 +7,6 @@
+ #define CRASH_KERNEL_LOW	"Crash kernel (low)\n"
  #define CRASH_KERNEL		"Crash kernel\n"
  #define IOMEM_RESERVED		"reserved\n"
-+#define QUICK_KEXEC     	"Quick kexec\n"
++#define QUICK_KEXEC             "Quick kexec\n"
  
  #endif
 diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index a3803e3..d12e426 100644
+index 219ec49..8a3bb69 100644
 --- a/kexec/arch/arm64/kexec-arm64.c
 +++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -96,6 +96,9 @@ uint64_t get_vp_offset(void)
+@@ -99,6 +99,9 @@ uint64_t get_vp_offset(void)
  	return arm64_mem.vp_offset;
  }
  
@@ -37,7 +37,7 @@ index a3803e3..d12e426 100644
  /**
   * arm64_process_image_header - Process the arm64 image header.
   *
-@@ -624,23 +627,33 @@ on_error:
+@@ -627,23 +630,33 @@ on_error:
  	return result;
  }
  
@@ -83,7 +83,7 @@ index a3803e3..d12e426 100644
  	} else {
  		hole = locate_hole(info,
  			arm64_mem.text_offset + arm64_mem.image_size,
-@@ -706,6 +719,8 @@ int arm64_load_other_segments(struct kexec_info *info,
+@@ -709,6 +722,8 @@ int arm64_load_other_segments(struct kexec_info *info,
  	hole_min = image_base + arm64_mem.image_size;
  	if (info->kexec_flags & KEXEC_ON_CRASH)
  		hole_max = crash_reserved_mem[usablemem_rgns.size - 1].end;
@@ -92,6 +92,16 @@ index a3803e3..d12e426 100644
  	else
  		hole_max = ULONG_MAX;
  
+@@ -944,7 +959,8 @@ static bool to_be_excluded(char *str)
+ 	if (!strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) ||
+ 	    !strncmp(str, KERNEL_CODE, strlen(KERNEL_CODE)) ||
+ 	    !strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) ||
+-	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)))
++	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) ||
++	    !strncmp(str, QUICK_KEXEC, strlen(QUICK_KEXEC)))
+ 		return false;
+ 	else
+ 		return true;
 diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
 index aa8f2e2..f22db62 100644
 --- a/kexec/arch/arm64/kexec-image-arm64.c
@@ -129,5 +139,5 @@ index aa8f2e2..f22db62 100644
  
  	if (arm64_process_image_header(header))
 -- 
-2.19.1
+2.9.5
 
