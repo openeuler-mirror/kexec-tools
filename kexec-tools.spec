@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 6
+Release: 7
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -94,13 +94,19 @@ Patch18: arm64-support-more-than-one-crash-kernel-regions.patch
 %endif
 
 Patch19: add-secure-compile-options-for-makedumpfile.patch
-Patch20:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
-Patch21: fix-header-offset-overflow-when-large-pfn.patch
-Patch22: kexec-Add-quick-kexec-support.patch
+Patch20: fix-header-offset-overflow-when-large-pfn.patch
+Patch21: kexec-Add-quick-kexec-support.patch
 
 %ifarch aarch64
-Patch23: kexec-Quick-kexec-implementation-for-arm64.patch
+Patch22: kexec-Quick-kexec-implementation-for-arm64.patch
 %endif
+
+Patch23: backport-PATCH-Align-PMD_SECTION_MASK-with-PHYS_MASK.patch
+Patch24: backport-PATCH-arm64-Add-support-for-ARMv8.2-LPA-52-bit-PA-su.patch
+Patch25: backport-PATCH-1-3-Use-vmcoreinfo-note-in-proc-kcore-for-mem-.patch
+Patch26: backport-PATCH-2-3-arm64-Make-use-of-NUMBER-VA_BITS-in-vmcore.patch
+Patch27: backport-PATCH-3-3-arm64-support-flipped-VA-and-52-bit-kernel.patch
+Patch28: backport-print-add-support-for-lockless-ringbuffer.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -149,11 +155,17 @@ tar -z -x -v -f %{SOURCE19}
 %patch19 -p1
 %patch20 -p1
 %patch21 -p1
-%patch22 -p1
 
 %ifarch aarch64
-%patch23 -p1
+%patch22 -p1
 %endif
+
+%patch23 -p1
+%patch24 -p1
+%patch25 -p1
+%patch26 -p1
+%patch27 -p1
+%patch28 -p1
 
 %build
 autoreconf
@@ -339,6 +351,10 @@ done
 %endif
 
 %changelog
+* Sat Mar 27 2021 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-7
+- Fix bug: Filed to generate the vmcore file in the ARM architecture
+  Fix bug: Filed to generate the vmcore-dmesg.txt file in the ARM architecture
+
 * Mon Mar 22 2021 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-6
 - support more than one crash kernel regions
 
