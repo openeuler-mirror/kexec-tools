@@ -4,8 +4,8 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 15
-License: GPLv2
+Release: 16
+License: GPLv2+
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
 Source0: http://kernel.org/pub/linux/utils/kernel/kexec/%{name}-%{version}.tar.xz
@@ -316,6 +316,9 @@ done
 %endif
 
 %changelog
+* Wed Apr 28 2021 snoweay <snoweay@163.com> - 2.0.20-16
+- Fix bug of license to GPLv2+
+
 * Wed Apr 28 2021 snoweay <snoweay@163.com> - 2.0.20-15
 - Add support for quick kexec
   kexec: Add quick kexec support
