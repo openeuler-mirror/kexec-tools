@@ -1,0 +1,101 @@
+From c4fa8f8344a5f7a3147c8bee34d37b6af35d02e7 Mon Sep 17 00:00:00 2001
+From: snoweay <snoweay@163.com>
+Date: Wed, 12 Aug 2020 07:53:13 -0400
+Subject: [PATCH] kexec: Add quick kexec support
+
+Add quick kexec option -q and flags.
+
+In normal kexec, relocating kernel may cost 5 ~ 10 seconds, to
+copy all segments from vmalloced memory to kernel boot memory,
+because of disabled mmu.
+
+We introduce quick kexec to save time of copying memory as above,
+just like kdump(kexec on crash), by using reserved memory.
+
+We also add this support in syscall kexec_load of linux kernel
+through flags of KEXEC_QUICK.
+---
+ kexec/kexec-syscall.h |  1 +
+ kexec/kexec.c         | 10 ++++++++++
+ kexec/kexec.h         |  4 +++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/kexec/kexec-syscall.h b/kexec/kexec-syscall.h
+index dac1c1f..b146b6a 100644
+--- a/kexec/kexec-syscall.h
++++ b/kexec/kexec-syscall.h
+@@ -102,6 +102,7 @@ static inline long kexec_file_load(int kernel_fd, int initrd_fd,
+ 
+ #define KEXEC_ON_CRASH		0x00000001
+ #define KEXEC_PRESERVE_CONTEXT	0x00000002
++#define KEXEC_QUICK		0x00000004
+ #define KEXEC_ARCH_MASK		0xffff0000
+ 
+ /* Flags for kexec file based system call */
+diff --git a/kexec/kexec.c b/kexec/kexec.c
+index bc6ab3d..48825af 100644
+--- a/kexec/kexec.c
++++ b/kexec/kexec.c
+@@ -997,6 +997,7 @@ void usage(void)
+ 	       " -l, --load           Load the new kernel into the\n"
+ 	       "                      current kernel.\n"
+ 	       " -p, --load-panic     Load the new kernel for use on panic.\n"
++	       " -q, --load-quick     Load the new kernel to quick kexec\n"
+ 	       " -u, --unload         Unload the current kexec target kernel.\n"
+ 	       "                      If capture kernel is being unloaded\n"
+ 	       "                      specify -p with -u.\n"
+@@ -1268,6 +1269,7 @@ int main(int argc, char *argv[])
+ {
+ 	int do_load = 1;
+ 	int do_exec = 0;
++	int do_quick = 0;
+ 	int do_load_jump_back_helper = 0;
+ 	int do_shutdown = 1;
+ 	int do_sync = 1, skip_sync = 0;
+@@ -1377,6 +1379,14 @@ int main(int argc, char *argv[])
+ 			kexec_file_flags |= KEXEC_FILE_ON_CRASH;
+ 			kexec_flags = KEXEC_ON_CRASH;
+ 			break;
++		case OPT_QUICK:
++			do_load = 1;
++			do_exec = 0;
++			do_shutdown = 0;
++			do_quick = 1;
++			kexec_flags = KEXEC_QUICK;
++			skip_checks = 1;
++			break;
+ 		case OPT_MEM_MIN:
+ 			mem_min = strtoul(optarg, &endptr, 0);
+ 			if (*endptr) {
+diff --git a/kexec/kexec.h b/kexec/kexec.h
+index a97b9ce..e31e4d2 100644
+--- a/kexec/kexec.h
++++ b/kexec/kexec.h
+@@ -221,6 +221,7 @@ extern int file_types;
+ #define OPT_UNLOAD		'u'
+ #define OPT_TYPE		't'
+ #define OPT_PANIC		'p'
++#define OPT_QUICK		'q'
+ #define OPT_KEXEC_FILE_SYSCALL	's'
+ #define OPT_KEXEC_SYSCALL	'c'
+ #define OPT_KEXEC_SYSCALL_AUTO	'a'
+@@ -248,6 +249,7 @@ extern int file_types;
+ 	{ "entry",		1, 0, OPT_ENTRY }, \
+ 	{ "type",		1, 0, OPT_TYPE }, \
+ 	{ "load-panic",         0, 0, OPT_PANIC }, \
++	{ "load-quick",         0, 0, OPT_QUICK }, \
+ 	{ "mem-min",		1, 0, OPT_MEM_MIN }, \
+ 	{ "mem-max",		1, 0, OPT_MEM_MAX }, \
+ 	{ "reuseinitrd",	0, 0, OPT_REUSE_INITRD }, \
+@@ -258,7 +260,7 @@ extern int file_types;
+ 	{ "status",		0, 0, OPT_STATUS }, \
+ 	{ "print-ckr-size",     0, 0, OPT_PRINT_CKR_SIZE }, \
+ 
+-#define KEXEC_OPT_STR "h?vdfixyluet:pscaS"
++#define KEXEC_OPT_STR "h?vdfixyluet:pqscaS"
+ 
+ extern void dbgprint_mem_range(const char *prefix, struct memory_range *mr, int nr_mr);
+ extern void die(const char *fmt, ...)
+-- 
+2.19.1
+
