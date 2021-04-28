@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 14
+Release: 15
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -86,6 +86,11 @@ Patch8:  add-secure-compile-options-for-makedumpfile.patch
 Patch9:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
 Patch10: fix-header-offset-overflow-when-large-pfn.patch
 
+Patch11: kexec-Add-quick-kexec-support.patch
+%ifarch aarch64
+Patch12: kexec-Quick-kexec-implementation-for-arm64.patch
+%endif
+
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
 kernel to boot using the kernel's kexec feature either on a
@@ -121,6 +126,11 @@ tar -z -x -v -f %{SOURCE19}
 %patch8  -p1
 %patch9  -p1
 %patch10 -p1
+
+%patch11 -p1
+%ifarch aarch64
+%patch12 -p1
+%endif
 
 %build
 autoreconf
@@ -306,6 +316,11 @@ done
 %endif
 
 %changelog
+* Wed Apr 28 2021 snoweay <snoweay@163.com> - 2.0.20-15
+- Add support for quick kexec
+  kexec: Add quick kexec support
+  arm64: Quick kexec implementation for arm64
+
 * Fri Nov 27 2020 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-14
 - Type:bugfix
 - ID:NA
