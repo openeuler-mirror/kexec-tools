@@ -1,0 +1,143 @@
+From 5a302cd06079a285cb24a74c0f60b26866ae4e4d Mon Sep 17 00:00:00 2001
+From: snoweay <snoweay@163.com>
+Date: Wed, 12 Aug 2020 07:59:06 -0400
+Subject: [PATCH] kexec: Quick kexec implementation for arm64
+
+Implement quick kexec on arch/arm64.
+
+Locate kernel segments from reserved memory of range "Quick kexec".
+---
+ kexec/arch/arm64/iomem.h             |  1 +
+ kexec/arch/arm64/kexec-arm64.c       | 42 +++++++++++++++++++++++++-----------
+ kexec/arch/arm64/kexec-image-arm64.c | 11 ++++++++++
+ 3 files changed, 41 insertions(+), 13 deletions(-)
+
+diff --git a/kexec/arch/arm64/iomem.h b/kexec/arch/arm64/iomem.h
+index d4864bb..108871e 100644
+--- a/kexec/arch/arm64/iomem.h
++++ b/kexec/arch/arm64/iomem.h
+@@ -6,5 +6,6 @@
+ #define KERNEL_DATA		"Kernel data\n"
+ #define CRASH_KERNEL		"Crash kernel\n"
+ #define IOMEM_RESERVED		"reserved\n"
++#define QUICK_KEXEC     	"Quick kexec\n"
+ 
+ #endif
+diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
+index 219ec49..8a3bb69 100644
+--- a/kexec/arch/arm64/kexec-arm64.c
++++ b/kexec/arch/arm64/kexec-arm64.c
+@@ -99,6 +99,9 @@ uint64_t get_vp_offset(void)
+ 	return arm64_mem.vp_offset;
+ }
+ 
++/* Reserved memory for quick kexec. */
++struct memory_range quick_reserved_mem;
++
+ /**
+  * arm64_process_image_header - Process the arm64 image header.
+  *
+@@ -627,23 +630,33 @@ on_error:
+ 	return result;
+ }
+ 
+-unsigned long arm64_locate_kernel_segment(struct kexec_info *info)
++static unsigned long locate_hole_from_range(struct memory_range *range)
+ {
+ 	unsigned long hole;
++	unsigned long hole_end;
+ 
+-	if (info->kexec_flags & KEXEC_ON_CRASH) {
+-		unsigned long hole_end;
++	hole = (range->start < mem_min ? mem_min : range->start);
++	hole = _ALIGN_UP(hole, MiB(2));
++	hole_end = hole + arm64_mem.text_offset + arm64_mem.image_size;
+ 
+-		hole = (crash_reserved_mem[usablemem_rgns.size - 1].start < mem_min ?
+-				mem_min : crash_reserved_mem[usablemem_rgns.size - 1].start);
+-		hole = _ALIGN_UP(hole, MiB(2));
+-		hole_end = hole + arm64_mem.text_offset + arm64_mem.image_size;
++	if ((hole_end > mem_max) ||
++	    (hole_end > range->end)) {
++		dbgprintf("%s: Kexec kernel out of range\n", __func__);
++		hole = ULONG_MAX;
++	}
+ 
+-		if ((hole_end > mem_max) ||
+-		    (hole_end > crash_reserved_mem[usablemem_rgns.size - 1].end)) {
+-			dbgprintf("%s: Crash kernel out of range\n", __func__);
+-			hole = ULONG_MAX;
+-		}
++	return hole;
++}
++
++unsigned long arm64_locate_kernel_segment(struct kexec_info *info)
++{
++	unsigned long hole;
++
++	if (info->kexec_flags & KEXEC_ON_CRASH) {
++		hole = locate_hole_from_range(
++			&crash_reserved_mem[usablemem_rgns.size - 1]);
++	} else if (info->kexec_flags & KEXEC_QUICK) {
++		hole = locate_hole_from_range(&quick_reserved_mem);
+ 	} else {
+ 		hole = locate_hole(info,
+ 			arm64_mem.text_offset + arm64_mem.image_size,
+@@ -709,6 +722,8 @@ int arm64_load_other_segments(struct kexec_info *info,
+ 	hole_min = image_base + arm64_mem.image_size;
+ 	if (info->kexec_flags & KEXEC_ON_CRASH)
+ 		hole_max = crash_reserved_mem[usablemem_rgns.size - 1].end;
++	else if (info->kexec_flags & KEXEC_QUICK)
++		hole_max = quick_reserved_mem.end;
+ 	else
+ 		hole_max = ULONG_MAX;
+ 
+@@ -944,7 +959,8 @@ static bool to_be_excluded(char *str)
+ 	if (!strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) ||
+ 	    !strncmp(str, KERNEL_CODE, strlen(KERNEL_CODE)) ||
+ 	    !strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) ||
+-	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)))
++	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) ||
++	    !strncmp(str, QUICK_KEXEC, strlen(QUICK_KEXEC)))
+ 		return false;
+ 	else
+ 		return true;
+diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
+index aa8f2e2..f22db62 100644
+--- a/kexec/arch/arm64/kexec-image-arm64.c
++++ b/kexec/arch/arm64/kexec-image-arm64.c
+@@ -13,6 +13,9 @@
+ #include "kexec-arm64.h"
+ #include "kexec-syscall.h"
+ #include "arch/options.h"
++#include "iomem.h"
++
++extern struct memory_range quick_reserved_mem;
+ 
+ int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
+ {
+@@ -38,6 +41,7 @@ int image_arm64_load(int argc, char **argv, const char *kernel_buf,
+ {
+ 	const struct arm64_image_header *header;
+ 	unsigned long kernel_segment;
++	unsigned long start, end;
+ 	int result;
+ 
+ 	if (info->file_mode) {
+@@ -61,6 +65,13 @@ int image_arm64_load(int argc, char **argv, const char *kernel_buf,
+ 		return 0;
+ 	}
+ 
++	if (info->kexec_flags & KEXEC_QUICK)
++		parse_iomem_single(QUICK_KEXEC, &start, &end);
++	dbgprintf("%s: Get Quick kexec reserved mem from 0x%016lx to 0x%016lx\n",
++		  __func__, start, end);
++	quick_reserved_mem.start = start;
++	quick_reserved_mem.end = end;
++
+ 	header = (const struct arm64_image_header *)(kernel_buf);
+ 
+ 	if (arm64_process_image_header(header))
+-- 
+2.9.5
+
