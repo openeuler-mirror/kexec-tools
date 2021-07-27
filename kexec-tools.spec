@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 6
+Release: 7
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -107,6 +107,7 @@ Patch25: backport-PATCH-1-3-Use-vmcoreinfo-note-in-proc-kcore-for-mem-.patch
 Patch26: backport-PATCH-2-3-arm64-Make-use-of-NUMBER-VA_BITS-in-vmcore.patch
 Patch27: backport-PATCH-3-3-arm64-support-flipped-VA-and-52-bit-kernel.patch
 Patch28: backport-print-add-support-for-lockless-ringbuffer.patch
+Patch29: 0001-fix-build-fail-caused-by-file-format-not-recognized.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -166,6 +167,7 @@ tar -z -x -v -f %{SOURCE19}
 %patch26 -p1
 %patch27 -p1
 %patch28 -p1
+%patch29 -p1
 
 %build
 autoreconf
@@ -351,6 +353,9 @@ done
 %endif
 
 %changelog
+* Tue Jul 27 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.20-7
+- fix build fail caused by file format not recognized
+
 * Sat Mar 27 2021 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-6
 - Type:bugfix
 - ID:NA
