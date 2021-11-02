@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 7
+Release: 8
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -89,17 +89,15 @@ Patch15: kexec-tools-Reset-getopt-before-falling-back-to-legacy.patch
 Patch16: kexec-support-parsing-the-string-Reserved-to-get-the-correct-e820-reserved-region.patch
 Patch17: arm64-kdump-deal-with-a-lot-of-resource-entries-in-proc-iomem.patch
 
-%ifarch aarch64
+# patch for aarch64 only
 Patch18: arm64-support-more-than-one-crash-kernel-regions.patch
-%endif
 
 Patch19: add-secure-compile-options-for-makedumpfile.patch
 Patch20: fix-header-offset-overflow-when-large-pfn.patch
 Patch21: kexec-Add-quick-kexec-support.patch
 
-%ifarch aarch64
+# patch for aarch64 only
 Patch22: kexec-Quick-kexec-implementation-for-arm64.patch
-%endif
 
 Patch23: backport-PATCH-Align-PMD_SECTION_MASK-with-PHYS_MASK.patch
 Patch24: backport-PATCH-arm64-Add-support-for-ARMv8.2-LPA-52-bit-PA-su.patch
@@ -353,6 +351,9 @@ done
 %endif
 
 %changelog
+* Tue Nov 2 2021 Jun Yang <jun.yang@suse.com> - 2.0.20-8
+- list all the patches for aarch64 to make the source rpm same both for x86_64 and aarch64
+
 * Tue Jul 27 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.20-7
 - fix build fail caused by file format not recognized
 
