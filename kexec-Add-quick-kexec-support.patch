@@ -1,8 +1,19 @@
-From e841cb419d74adbda7116a6b11b5fcaeba0dc274 Mon Sep 17 00:00:00 2001
-From: root <root@localhost.localdomain>
-Date: Sat, 25 Dec 2021 17:42:47 +0800
-Subject: [PATCH] fix
+From c4fa8f8344a5f7a3147c8bee34d37b6af35d02e7 Mon Sep 17 00:00:00 2001
+From: snoweay <snoweay@163.com>
+Date: Wed, 12 Aug 2020 07:53:13 -0400
+Subject: [PATCH] kexec: Add quick kexec support
 
+Add quick kexec option -q and flags.
+
+In normal kexec, relocating kernel may cost 5 ~ 10 seconds, to
+copy all segments from vmalloced memory to kernel boot memory,
+because of disabled mmu.
+
+We introduce quick kexec to save time of copying memory as above,
+just like kdump(kexec on crash), by using reserved memory.
+
+We also add this support in syscall kexec_load of linux kernel
+through flags of KEXEC_QUICK.
 ---
  kexec/kexec-syscall.h |  1 +
  kexec/kexec.c         | 10 ++++++++++

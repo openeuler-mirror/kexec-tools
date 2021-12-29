@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 1
+Release: 2
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -289,6 +289,9 @@ done
 %endif
 
 %changelog
+* Wed Dec 29 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.23-2
+- modify the patch header
+
 * Sat Dec 25 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.23-1
 - update to 2.0.23
 
