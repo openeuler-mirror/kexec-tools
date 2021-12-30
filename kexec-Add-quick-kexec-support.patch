@@ -21,10 +21,10 @@ through flags of KEXEC_QUICK.
  3 files changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/kexec/kexec-syscall.h b/kexec/kexec-syscall.h
-index dac1c1f..b146b6a 100644
+index bea29d4..6eea272 100644
 --- a/kexec/kexec-syscall.h
 +++ b/kexec/kexec-syscall.h
-@@ -102,6 +102,7 @@ static inline long kexec_file_load(int kernel_fd, int initrd_fd,
+@@ -109,6 +109,7 @@ static inline long kexec_file_load(int kernel_fd, int initrd_fd,
  
  #define KEXEC_ON_CRASH		0x00000001
  #define KEXEC_PRESERVE_CONTEXT	0x00000002
@@ -33,10 +33,10 @@ index dac1c1f..b146b6a 100644
  
  /* Flags for kexec file based system call */
 diff --git a/kexec/kexec.c b/kexec/kexec.c
-index bc6ab3d..48825af 100644
+index f63b36b..5b8beca 100644
 --- a/kexec/kexec.c
 +++ b/kexec/kexec.c
-@@ -997,6 +997,7 @@ void usage(void)
+@@ -1009,6 +1009,7 @@ void usage(void)
  	       " -l, --load           Load the new kernel into the\n"
  	       "                      current kernel.\n"
  	       " -p, --load-panic     Load the new kernel for use on panic.\n"
@@ -44,15 +44,15 @@ index bc6ab3d..48825af 100644
  	       " -u, --unload         Unload the current kexec target kernel.\n"
  	       "                      If capture kernel is being unloaded\n"
  	       "                      specify -p with -u.\n"
-@@ -1268,6 +1269,7 @@ int main(int argc, char *argv[])
- {
+@@ -1340,6 +1341,7 @@ int main(int argc, char *argv[])
+ 	int has_opt_load = 0;
  	int do_load = 1;
  	int do_exec = 0;
 +	int do_quick = 0;
  	int do_load_jump_back_helper = 0;
  	int do_shutdown = 1;
  	int do_sync = 1, skip_sync = 0;
-@@ -1377,6 +1379,14 @@ int main(int argc, char *argv[])
+@@ -1460,6 +1462,14 @@ int main(int argc, char *argv[])
  			kexec_file_flags |= KEXEC_FILE_ON_CRASH;
  			kexec_flags = KEXEC_ON_CRASH;
  			break;
@@ -68,10 +68,10 @@ index bc6ab3d..48825af 100644
  			mem_min = strtoul(optarg, &endptr, 0);
  			if (*endptr) {
 diff --git a/kexec/kexec.h b/kexec/kexec.h
-index a97b9ce..e31e4d2 100644
+index 595dd68..9cbc77f 100644
 --- a/kexec/kexec.h
 +++ b/kexec/kexec.h
-@@ -221,6 +221,7 @@ extern int file_types;
+@@ -218,6 +218,7 @@ extern int file_types;
  #define OPT_UNLOAD		'u'
  #define OPT_TYPE		't'
  #define OPT_PANIC		'p'
@@ -79,7 +79,7 @@ index a97b9ce..e31e4d2 100644
  #define OPT_KEXEC_FILE_SYSCALL	's'
  #define OPT_KEXEC_SYSCALL	'c'
  #define OPT_KEXEC_SYSCALL_AUTO	'a'
-@@ -248,6 +249,7 @@ extern int file_types;
+@@ -249,6 +250,7 @@ extern int file_types;
  	{ "entry",		1, 0, OPT_ENTRY }, \
  	{ "type",		1, 0, OPT_TYPE }, \
  	{ "load-panic",         0, 0, OPT_PANIC }, \
@@ -87,7 +87,7 @@ index a97b9ce..e31e4d2 100644
  	{ "mem-min",		1, 0, OPT_MEM_MIN }, \
  	{ "mem-max",		1, 0, OPT_MEM_MAX }, \
  	{ "reuseinitrd",	0, 0, OPT_REUSE_INITRD }, \
-@@ -258,7 +260,7 @@ extern int file_types;
+@@ -259,7 +261,7 @@ extern int file_types;
  	{ "status",		0, 0, OPT_STATUS }, \
  	{ "print-ckr-size",     0, 0, OPT_PRINT_CKR_SIZE }, \
  
@@ -97,5 +97,5 @@ index a97b9ce..e31e4d2 100644
  extern void dbgprint_mem_range(const char *prefix, struct memory_range *mr, int nr_mr);
  extern void die(const char *fmt, ...)
 -- 
-2.19.1
+2.30.0
 

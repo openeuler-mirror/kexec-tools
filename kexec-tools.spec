@@ -1,10 +1,10 @@
-%global eppic_ver d84c3541035d95077aa8571f5d5c3e07c6ef510b
+%global eppic_ver e8844d3793471163ae4a56d8f95897be9e5bd554
 %global eppic_shortver %(c=%{eppic_ver}; echo ${c:0:7})
-%global mkdf_ver 1.6.7
+%global mkdf_ver 1.7.0
 
 Name: kexec-tools
-Version: 2.0.20
-Release: 8
+Version: 2.0.23
+Release: 1
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -16,7 +16,7 @@ Source4: kdump.sysconfig.i386
 Source5: kdump.sysconfig.ppc64
 Source7: mkdumprd
 Source8: kdump.conf
-Source9: http://downloads.sourceforge.net/project/makedumpfile/makedumpfile/%{mkdf_ver}/makedumpfile-%{mkdf_ver}.tar.gz
+Source9: https://github.com/makedumpfile/makedumpfile/releases/download/%{mkdf_ver}/makedumpfile-%{mkdf_ver}.tar.gz
 Source12: mkdumprd.8
 Source13: 98-kexec.rules
 Source14: 98-kexec.rules.ppc64
@@ -69,43 +69,10 @@ Requires:       systemd-udev%{?_isa}
 
 %undefine _hardened_build
 
-Patch0: kexec-tools-2.0.20-fix-broken-multiboot2-buliding-for-i386.patch
-Patch1: kexec-tools-2.0.20-eppic-Remove-duplicated-variable-declaration.patch
-Patch2: kexec-tools-2.0.20-makedumpfile-Remove-duplicated-variable-declarations.patch
-Patch3: kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
-Patch4: kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
-Patch5: kexec-add-variant-helper-functions-for-handling-memory-regions.patch
-Patch6: arm64-kexec-allocate-memory-space-avoiding-reserved-regions.patch
-
-Patch7: x86-Fix-PAGE_OFFSET-for-kernels-since-4.20.patch
-Patch8: Cleanup-remove-the-read_elf_kcore.patch
-Patch9: Fix-an-error-definition-about-the-variable-fname.patch
-Patch10: Cleanup-move-it-back-from-util_lib-elf_info.c.patch
-Patch11: Limit-the-size-of-vmcore-dmesg.txt-to-2G.patch
-Patch12: vmcore-dmesg-vmcore-dmesg.c-Fix-shifting-error-reported-by-cppcheck.patch
-Patch13: kexec-tools-Fix-possible-out-of-bounds-access-in-ifdown.patch
-Patch14: kexec-tools-Fix-kexec_file_load-2-error-handling.patch
-Patch15: kexec-tools-Reset-getopt-before-falling-back-to-legacy.patch
-Patch16: kexec-support-parsing-the-string-Reserved-to-get-the-correct-e820-reserved-region.patch
-Patch17: arm64-kdump-deal-with-a-lot-of-resource-entries-in-proc-iomem.patch
-
-# patch for aarch64 only
-Patch18: arm64-support-more-than-one-crash-kernel-regions.patch
-
-Patch19: add-secure-compile-options-for-makedumpfile.patch
-Patch20: fix-header-offset-overflow-when-large-pfn.patch
-Patch21: kexec-Add-quick-kexec-support.patch
-
-# patch for aarch64 only
-Patch22: kexec-Quick-kexec-implementation-for-arm64.patch
-
-Patch23: backport-PATCH-Align-PMD_SECTION_MASK-with-PHYS_MASK.patch
-Patch24: backport-PATCH-arm64-Add-support-for-ARMv8.2-LPA-52-bit-PA-su.patch
-Patch25: backport-PATCH-1-3-Use-vmcoreinfo-note-in-proc-kcore-for-mem-.patch
-Patch26: backport-PATCH-2-3-arm64-Make-use-of-NUMBER-VA_BITS-in-vmcore.patch
-Patch27: backport-PATCH-3-3-arm64-support-flipped-VA-and-52-bit-kernel.patch
-Patch28: backport-print-add-support-for-lockless-ringbuffer.patch
-Patch29: 0001-fix-build-fail-caused-by-file-format-not-recognized.patch
+Patch0001:	arm64-support-more-than-one-crash-kernel-regions.patch
+Patch0002:	add-secure-compile-options-for-makedumpfile.patch
+Patch0003:	kexec-Add-quick-kexec-support.patch
+Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -128,44 +95,17 @@ mkdir -p -m755 kcp
 tar -z -x -v -f %{SOURCE9}
 tar -z -x -v -f %{SOURCE19}
 
-%patch0 -p1
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
-%patch6 -p1
-%patch7 -p1
-%patch8 -p1
-%patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
-%patch13 -p1
-%patch14 -p1
-%patch15 -p1
-%patch16 -p1
-%patch17 -p1
-
 %ifarch aarch64
-%patch18 -p1
+%patch0001 -p1
 %endif
 
-%patch19 -p1
-%patch20 -p1
-%patch21 -p1
+%patch0002 -p1
+%patch0003 -p1
 
 %ifarch aarch64
-%patch22 -p1
+%patch0004 -p1
 %endif
 
-%patch23 -p1
-%patch24 -p1
-%patch25 -p1
-%patch26 -p1
-%patch27 -p1
-%patch28 -p1
-%patch29 -p1
 
 %build
 autoreconf
@@ -351,6 +291,9 @@ done
 %endif
 
 %changelog
+* Sat Dec 25 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.23-1
+- update to 2.0.23
+
 * Tue Nov 2 2021 Jun Yang <jun.yang@suse.com> - 2.0.20-8
 - list all the patches for aarch64 to make the source rpm same both for x86_64 and aarch64
 
