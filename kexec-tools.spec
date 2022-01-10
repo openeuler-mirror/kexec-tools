@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 2
+Release: 3
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -73,6 +73,9 @@ Patch0001:	arm64-support-more-than-one-crash-kernel-regions.patch
 Patch0002:	add-secure-compile-options-for-makedumpfile.patch
 Patch0003:	kexec-Add-quick-kexec-support.patch
 Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
+%ifarch riscv64
+Patch0005:	support_riscv.patch
+%endif
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -102,6 +105,9 @@ tar -z -x -v -f %{SOURCE19}
 %patch0003 -p1
 %ifarch aarch64
 %patch0004 -p1
+%endif
+%ifarch riscv64
+%patch0005 -p1
 %endif
 
 
@@ -289,6 +295,9 @@ done
 %endif
 
 %changelog
+* Mon Jan 10 2022 lvxiaoqian <xiaoqian@nj.iscas.ac.cn> - 2.0.23-3
+- add patch to support riscv
+
 * Wed Dec 29 2021 zhouwenpei <zhouwenpei1@huawei.com> - 2.0.23-2
 - modify the patch header
 
