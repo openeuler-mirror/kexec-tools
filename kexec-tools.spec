@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 14
+Release: 15
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -76,13 +76,8 @@ Patch3:  kexec-tools-2.0.20-Remove-duplicated-variable-declarations.patch
 Patch4:  kexec-tools-2.0.20-makedumpfile-Introduce-check-params-option.patch
 Patch5:  kexec-add-variant-helper-functions-for-handling-memory-regions.patch
 Patch6:  arm64-kexec-allocate-memory-space-avoiding-reserved-regions.patch
-
-%ifarch aarch64
 Patch7:  arm64-support-more-than-one-crash-kernel-regions.patch
-%endif
-
 Patch8:  add-secure-compile-options-for-makedumpfile.patch
-
 Patch9:  bugfix-get-the-paddr-of-mem_section-return-error-address.patch
 Patch10: fix-header-offset-overflow-when-large-pfn.patch
 
@@ -306,6 +301,9 @@ done
 %endif
 
 %changelog
+* Thu Jan 06 2022 Wang Jiangyong <wangjy41@chinatelecom.cn> - 2.0.20-15
+- not need define patch by arch
+
 * Fri Nov 27 2020 yangzhuangzhuang <yangzhuangzhuang1@huawei.com> - 2.0.20-14
 - Type:bugfix
 - ID:NA
