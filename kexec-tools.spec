@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 3
+Release: 4
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -73,6 +73,7 @@ Patch0001:	arm64-support-more-than-one-crash-kernel-regions.patch
 Patch0002:	add-secure-compile-options-for-makedumpfile.patch
 Patch0003:	kexec-Add-quick-kexec-support.patch
 Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
+Patch0005:	arm64-crashdump-deduce-paddr-of-_text-based-on-kerne.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -103,7 +104,7 @@ tar -z -x -v -f %{SOURCE19}
 %ifarch aarch64
 %patch0004 -p1
 %endif
-
+%patch0005 -p1
 
 %build
 autoreconf
@@ -289,6 +290,9 @@ done
 %endif
 
 %changelog
+* Wed Feb 23 2022 wangbin <wangbin224@huawei.com> - 2.0.23-4
+- arm64/crashdump: deduce paddr of _text based on kernel code size
+
 * Wed Feb 23 2022 snoweay <snoweay@163.com> - 2.0.23-3
 - Fix conflicts between quick kexec and load-live-update with xen.
 
