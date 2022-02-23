@@ -1,0 +1,65 @@
+From 1614959f2f0d79b5f7fdc57d6aa42da1a0298153 Mon Sep 17 00:00:00 2001
+From: Pingfan Liu <piliu@redhat.com>
+Date: Fri, 10 Dec 2021 10:57:33 +0800
+Subject: [PATCH] arm64/crashdump: deduce paddr of _text based on kernel code
+ size
+
+kexec-tools commit 61b8c79b0fb7 ("arm64/crashdump-arm64: deduce the
+paddr of _text") tries to deduce the paddr of _text, but turns out
+partially.
+
+That commit is based on "The Image must be placed text_offset bytes from
+a 2MB aligned base address anywhere in usable system RAM and called
+there" in linux/Documentation/arm64/booting.rst, plus text_offset field
+is zero.
+
+But in practice, some boot loaders does not obey the convention, and
+still boots up the kernel successfully.
+
+Revisiting kernel commit e2a073dde921 ("arm64: omit [_text, _stext) from
+permanent kernel mapping"), the kernel code size changes from (unsigned
+long)__init_begin - (unsigned long)_text to (unsigned long)__init_begin
+- (unsigned long)_stext
+
+And it should be a better factor to decide which label starts the
+"Kernel code" in /proc/iomem.
+
+Signed-off-by: Pingfan Liu <piliu@redhat.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ kexec/arch/arm64/crashdump-arm64.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/kexec/arch/arm64/crashdump-arm64.c b/kexec/arch/arm64/crashdump-arm64.c
+index 03d6204..a02019a 100644
+--- a/kexec/arch/arm64/crashdump-arm64.c
++++ b/kexec/arch/arm64/crashdump-arm64.c
+@@ -91,14 +91,22 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
+ 		return mem_regions_alloc_and_add(&system_memory_rgns,
+ 						base, length, RANGE_RAM);
+ 	else if (strncmp(str, KERNEL_CODE, strlen(KERNEL_CODE)) == 0) {
++
++		unsigned long long  kva_text = get_kernel_sym("_text");
++		unsigned long long  kva_stext = get_kernel_sym("_stext");
++		unsigned long long  kva_text_end = get_kernel_sym("__init_begin");
++
+ 		/*
+ 		 * old: kernel_code.start   = __pa_symbol(_text);
+ 		 * new: kernel_code.start   = __pa_symbol(_stext);
+ 		 *
+-		 * By utilizing the fact that paddr(_text) should align on 2MB, plus
+-		 * _stext - _text <= 64K.
++		 * For compatibility, deduce by comparing the gap "__init_begin - _stext"
++		 * and the res size of "Kernel code" in /proc/iomem
+ 		 */
+-		elf_info.kern_paddr_start = base & ((0xffffffffffffffffUL) << 21);
++		if (kva_text_end - kva_stext == length)
++			elf_info.kern_paddr_start = base - (kva_stext - kva_text);
++		else
++			elf_info.kern_paddr_start = base;
+ 	}
+ 	else if (strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) == 0)
+ 		elf_info.kern_size = base + length - elf_info.kern_paddr_start;
+-- 
+1.8.3.1
+
