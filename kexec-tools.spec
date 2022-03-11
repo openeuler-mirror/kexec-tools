@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 3
+Release: 4
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -19,7 +19,6 @@ Source8: kdump.conf
 Source9: https://github.com/makedumpfile/makedumpfile/releases/download/%{mkdf_ver}/makedumpfile-%{mkdf_ver}.tar.gz
 Source12: mkdumprd.8
 Source13: 98-kexec.rules
-Source14: 98-kexec.rules.ppc64
 Source15: kdump.conf.5
 Source16: kdump.service
 Source18: kdump.sysconfig.s390x
@@ -160,7 +159,6 @@ install -m 644 %{SOURCE15} %{buildroot}%{_mandir}/man5/kdump.conf.5
 install -m 644 %{SOURCE16} %{buildroot}%{_unitdir}/kdump.service
 install -m 755 -D %{SOURCE22} %{buildroot}%{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
 install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
-install -m 644 %{SOURCE14} %{buildroot}%{_udevrulesdir}/98-kexec.rules
 
 %ifarch %{ix86} x86_64 aarch64
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
@@ -292,6 +290,9 @@ done
 %endif
 
 %changelog
+* Fri Mar 11 2022 wangbin <wangbin224@huawei.com> - 2.0.23-4
+- packing 98-kexec.rules instead of 98-kexec.rules.ppc64
+
 * Wed Feb 23 2022 wangbin <wangbin224@huawei.com> - 2.0.23-3
 - arm64/crashdump: deduce paddr of _text based on kernel code size
 
