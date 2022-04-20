@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 4
+Release: 5
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -33,6 +33,7 @@ Source26: live-image-kdump-howto.txt
 Source27: early-kdump-howto.txt
 Source28: kdump-udev-throttler
 Source29: kdump.sysconfig.aarch64
+Source30: kdump.sysconfig.loongarch64
 
 Source100: dracut-kdump.sh
 Source101: dracut-module-setup.sh
@@ -73,6 +74,8 @@ Patch0002:	add-secure-compile-options-for-makedumpfile.patch
 Patch0003:	kexec-Add-quick-kexec-support.patch
 Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
 Patch0005:	arm64-crashdump-deduce-paddr-of-_text-based-on-kerne.patch
+Patch0006:  fix-add-64-bit-loongArch-support-1.patch
+Patch0007:  fix-add-64-bit-loongArch-support-2.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -106,6 +109,8 @@ tar -z -x -v -f %{SOURCE19}
 %patch0004 -p1
 %endif
 %patch0005 -p1
+%patch0006 -p1
+%patch0007 -p1
 
 %build
 autoreconf
@@ -116,7 +121,7 @@ rm -f kexec-tools.spec.in
 cp %{SOURCE21} %{SOURCE26} %{SOURCE27} .
 
 make
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 make -C eppic-%{eppic_ver}/libeppic
 make -C makedumpfile-%{mkdf_ver} LINKTYPE=dynamic USELZO=on USESNAPPY=on
 make -C makedumpfile-%{mkdf_ver} LDFLAGS="$LDFLAGS -I../eppic-%{eppic_ver}/libeppic -L../eppic-%{eppic_ver}/libeppic" eppic_makedumpfile.so
@@ -160,7 +165,7 @@ install -m 644 %{SOURCE16} %{buildroot}%{_unitdir}/kdump.service
 install -m 755 -D %{SOURCE22} %{buildroot}%{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
 install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8.gz $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8.gz
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5.gz $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5.gz
@@ -265,14 +270,14 @@ done
 %{dracutlibdir}/modules.d/*
 %{_unitdir}/kdump.service
 %{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_libdir}/eppic_makedumpfile.so
 /usr/share/makedumpfile/
 %endif
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_sysconfdir}/makedumpfile.conf.sample
 %endif
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 /usr/sbin/makedumpfile
 %endif
 
@@ -285,11 +290,14 @@ done
 %{_mandir}/man8/mkdumprd.8.gz
 %{_mandir}/man8/vmcore-dmesg.8.gz
 %{_mandir}/man5/*
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_mandir}/man8/makedumpfile.8.gz
 %endif
 
 %changelog
+* Wed Apr 20 2022 wulei <wulei80@h-parthers.com> - 2.0.23-5
+- Add 64 bit loongArch support
+
 * Fri Mar 11 2022 wangbin <wangbin224@huawei.com> - 2.0.23-4
 - packing 98-kexec.rules instead of 98-kexec.rules.ppc64
 
