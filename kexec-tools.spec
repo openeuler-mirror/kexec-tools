@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 16
+Release: 17
 License: GPLv2+
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -89,6 +89,7 @@ Patch10: fix-header-offset-overflow-when-large-pfn.patch
 Patch11: kexec-Add-quick-kexec-support.patch
 %ifarch aarch64
 Patch12: kexec-Quick-kexec-implementation-for-arm64.patch
+Patch13: arm64-kdump-deal-with-a-lot-of-resource-entries-in-p.patch
 %endif
 
 %description
@@ -130,6 +131,7 @@ tar -z -x -v -f %{SOURCE19}
 %patch11 -p1
 %ifarch aarch64
 %patch12 -p1
+%patch13 -p1
 %endif
 
 %build
@@ -316,6 +318,9 @@ done
 %endif
 
 %changelog
+* Mon Apr 25 2022 wangbin <wangbin224@huawei.com> - 2.0.20-17
+- arm64: kdump: deal with a lot of resource entries in /proc/iomem
+
 * Wed Apr 28 2021 snoweay <snoweay@163.com> - 2.0.20-16
 - Fix bug of license to GPLv2+
 
