@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 17
+Release: 18
 License: GPLv2+
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -318,6 +318,9 @@ done
 %endif
 
 %changelog
+* Wed Aug 3 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.20-18
+- fix CVE-2021-20269
+
 * Mon Apr 25 2022 wangbin <wangbin224@huawei.com> - 2.0.20-17
 - arm64: kdump: deal with a lot of resource entries in /proc/iomem
 
