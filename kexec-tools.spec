@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.20
-Release: 15
+Release: 16
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -301,6 +301,9 @@ done
 %endif
 
 %changelog
+* Wed Aug 3 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.20-16
+- fix CVE-2021-20269
+
 * Thu Jan 06 2022 Wang Jiangyong <wangjy41@chinatelecom.cn> - 2.0.20-15
 - not need define patch by arch
 
