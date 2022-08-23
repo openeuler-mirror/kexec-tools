@@ -256,11 +256,9 @@ check_config()
 			;;
 		net|options|link_delay|disk_timeout|debug_mem_level|blacklist)
 			echo "Deprecated kdump config option: $config_opt. Refer to kdump.conf manpage for alternatives."
-			return 1
 			;;
 		*)
 			echo "Invalid kdump config option $config_opt"
-			return 1;
 			;;
 		esac
 	done <<< "$(read_strip_comments $KDUMP_CONFIG_FILE)"
