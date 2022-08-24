@@ -1,0 +1,124 @@
+From 67ea2d99e1356352034dc9d9c7b5ec6dd6b722eb Mon Sep 17 00:00:00 2001
+From: Pingfan Liu <piliu@redhat.com>
+Date: Tue, 18 Jan 2022 15:48:09 +0800
+Subject: [PATCH] arm64: make phys_offset signed
+
+After kernel commit 7bc1a0f9e176 ("arm64: mm: use single quantity to
+represent the PA to VA translation"), phys_offset can be negative if
+running 52-bits kernel on 48-bits hardware.
+
+So changing phys_offset from unsigned to signed.
+
+Signed-off-by: Pingfan Liu <piliu@redhat.com>
+Reviewed-by: Philipp Rudo <prudo@redhat.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+Conflict:NA
+Reference:https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git/commit/?id=67ea2d99e1356352034dc9d9c7b5ec6dd6b722eb
+
+---
+ kexec/arch/arm64/kexec-arm64.c | 12 ++++++------
+ kexec/arch/arm64/kexec-arm64.h |  2 +-
+ util_lib/elf_info.c            |  2 +-
+ util_lib/include/elf_info.h    |  2 +-
+ 4 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
+index 44ca3db..9dc1d8f 100644
+--- a/kexec/arch/arm64/kexec-arm64.c
++++ b/kexec/arch/arm64/kexec-arm64.c
+@@ -878,7 +878,7 @@ void add_segment(struct kexec_info *info, const void *buf, size_t bufsz,
+ 	add_segment_phys_virt(info, buf, bufsz, base, memsz, 1);
+ }
+ 
+-static inline void set_phys_offset(uint64_t v, char *set_method)
++static inline void set_phys_offset(int64_t v, char *set_method)
+ {
+ 	if (arm64_mem.phys_offset == arm64_mem_ngv
+ 		|| v < arm64_mem.phys_offset) {
+@@ -947,7 +947,7 @@ static int get_page_offset(void)
+  * from VMCOREINFO note inside 'kcore'.
+  */
+ 
+-static int get_phys_offset_from_vmcoreinfo_pt_note(unsigned long *phys_offset)
++static int get_phys_offset_from_vmcoreinfo_pt_note(long *phys_offset)
+ {
+ 	int fd, ret = 0;
+ 
+@@ -967,7 +967,7 @@ static int get_phys_offset_from_vmcoreinfo_pt_note(unsigned long *phys_offset)
+  * from PT_LOADs inside 'kcore'.
+  */
+ 
+-int get_phys_base_from_pt_load(unsigned long *phys_offset)
++int get_phys_base_from_pt_load(long *phys_offset)
+ {
+ 	int i, fd, ret;
+ 	unsigned long long phys_start;
+@@ -1025,7 +1025,7 @@ static bool to_be_excluded(char *str, unsigned long long start, unsigned long lo
+ int get_memory_ranges(struct memory_range **range, int *ranges,
+ 	unsigned long kexec_flags)
+ {
+-	unsigned long phys_offset = UINT64_MAX;
++	long phys_offset = -1;
+ 	FILE *fp;
+ 	const char *iomem = proc_iomem();
+ 	char line[MAX_LINE], *str;
+@@ -1047,7 +1047,7 @@ int get_memory_ranges(struct memory_range **range, int *ranges,
+ 		 */
+ 		ret = get_phys_offset_from_vmcoreinfo_pt_note(&phys_offset);
+ 		if (!ret) {
+-			if (phys_offset != UINT64_MAX)
++			if (phys_offset != -1)
+ 				set_phys_offset(phys_offset,
+ 						"vmcoreinfo pt_note");
+ 		} else {
+@@ -1059,7 +1059,7 @@ int get_memory_ranges(struct memory_range **range, int *ranges,
+ 			 */
+ 			ret = get_phys_base_from_pt_load(&phys_offset);
+ 			if (!ret)
+-				if (phys_offset != UINT64_MAX)
++				if (phys_offset != -1)
+ 					set_phys_offset(phys_offset,
+ 							"pt_load");
+ 		}
+diff --git a/kexec/arch/arm64/kexec-arm64.h b/kexec/arch/arm64/kexec-arm64.h
+index ed447ac..bfd4172 100644
+--- a/kexec/arch/arm64/kexec-arm64.h
++++ b/kexec/arch/arm64/kexec-arm64.h
+@@ -58,7 +58,7 @@ extern off_t initrd_size;
+  */
+ 
+ struct arm64_mem {
+-	uint64_t phys_offset;
++	int64_t phys_offset;
+ 	uint64_t text_offset;
+ 	uint64_t image_size;
+ 	uint64_t vp_offset;
+diff --git a/util_lib/elf_info.c b/util_lib/elf_info.c
+index 51d8b92..5574c7f 100644
+--- a/util_lib/elf_info.c
++++ b/util_lib/elf_info.c
+@@ -1236,7 +1236,7 @@ int read_elf(int fd)
+ 	return 0;
+ }
+ 
+-int read_phys_offset_elf_kcore(int fd, unsigned long *phys_off)
++int read_phys_offset_elf_kcore(int fd, long *phys_off)
+ {
+ 	int ret;
+ 
+diff --git a/util_lib/include/elf_info.h b/util_lib/include/elf_info.h
+index 4bc9279..f550d86 100644
+--- a/util_lib/include/elf_info.h
++++ b/util_lib/include/elf_info.h
+@@ -28,7 +28,7 @@ int get_pt_load(int idx,
+ 	unsigned long long *phys_end,
+ 	unsigned long long *virt_start,
+ 	unsigned long long *virt_end);
+-int read_phys_offset_elf_kcore(int fd, unsigned long *phys_off);
++int read_phys_offset_elf_kcore(int fd, long *phys_off);
+ int read_elf(int fd);
+ void dump_dmesg(int fd, void (*handler)(char*, unsigned int));
+ 
+-- 
+2.33.0
+
