@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 7
+Release: 8
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -73,6 +73,10 @@ Patch0002:	add-secure-compile-options-for-makedumpfile.patch
 Patch0003:	kexec-Add-quick-kexec-support.patch
 Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
 Patch0005:	arm64-crashdump-deduce-paddr-of-_text-based-on-kerne.patch
+Patch0006:	arm64-make-phys_offset-signed.patch
+Patch0007:	arm64-crashdump-unify-routine-to-get-page_offset.patch
+Patch0008:	arm64-read-VA_BITS-from-kcore-for-52-bits-VA-kernel.patch
+Patch0009:	arm64-fix-PAGE_OFFSET-calc-for-flipped-mm.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -104,6 +108,10 @@ tar -z -x -v -f %{SOURCE19}
 %patch0004 -p1
 %endif
 %patch0005 -p1
+%patch0006 -p1
+%patch0007 -p1
+%patch0008 -p1
+%patch0009 -p1
 
 %build
 autoreconf
@@ -288,6 +296,9 @@ done
 %endif
 
 %changelog
+* Wed Aug 24 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-8
+- arm64: fix PAGE_OFFSET calc for flipped mm
+
 * Tue Aug 23 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-7
 - kdumpctl:ignore deprecated and invalid kdump config option
 
