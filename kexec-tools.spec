@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 7
+Release: 8
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -99,16 +99,12 @@ mkdir -p -m755 kcp
 tar -z -x -v -f %{SOURCE9}
 tar -z -x -v -f %{SOURCE19}
 
-%ifarch aarch64
 %patch0001 -p1
-%endif
 
 %patch0002 -p1
 %patch0003 -p1
 
-%ifarch aarch64
 %patch0004 -p1
-%endif
 %patch0005 -p1
 %patch0006 -p1
 %patch0007 -p1
@@ -298,6 +294,9 @@ done
 %endif
 
 %changelog
+* Wed Oct 5 2022 huangduirong <huangduirong@huawei.com> - 2.0.23-8
+- remove the ifarch in prep of spec file
+
 * Wed Aug 24 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-7
 - arm64: fix PAGE_OFFSET calc for flipped mm
 
