@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 8
+Release: 9
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -33,6 +33,7 @@ Source26: live-image-kdump-howto.txt
 Source27: early-kdump-howto.txt
 Source28: kdump-udev-throttler
 Source29: kdump.sysconfig.aarch64
+Source30: kdump.sysconfig.loongarch64
 
 Source100: dracut-kdump.sh
 Source101: dracut-module-setup.sh
@@ -77,6 +78,10 @@ Patch0006:	arm64-make-phys_offset-signed.patch
 Patch0007:	arm64-crashdump-unify-routine-to-get-page_offset.patch
 Patch0008:	arm64-read-VA_BITS-from-kcore-for-52-bits-VA-kernel.patch
 Patch0009:	arm64-fix-PAGE_OFFSET-calc-for-flipped-mm.patch
+%ifarch loongarch64
+Patch0010:      fix-add-64-bit-loongArch-support-1.patch
+Patch0011:      fix-add-64-bit-loongArch-support-2.patch
+%endif
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -113,6 +118,11 @@ tar -z -x -v -f %{SOURCE19}
 %patch0008 -p1
 %patch0009 -p1
 
+%ifarch loongarch64
+%patch0010 -p1
+%patch0011 -p1
+%endif
+
 %build
 autoreconf
 %configure --sbindir=/usr/sbin \
@@ -122,7 +132,7 @@ rm -f kexec-tools.spec.in
 cp %{SOURCE21} %{SOURCE26} %{SOURCE27} .
 
 make
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 make -C eppic-%{eppic_ver}/libeppic
 make -C makedumpfile-%{mkdf_ver} LINKTYPE=dynamic USELZO=on USESNAPPY=on
 make -C makedumpfile-%{mkdf_ver} LDFLAGS="$LDFLAGS -I../eppic-%{eppic_ver}/libeppic -L../eppic-%{eppic_ver}/libeppic" eppic_makedumpfile.so
@@ -166,7 +176,7 @@ install -m 644 %{SOURCE16} %{buildroot}%{_unitdir}/kdump.service
 install -m 755 -D %{SOURCE22} %{buildroot}%{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
 install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8.gz $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8.gz
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5.gz $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5.gz
@@ -271,14 +281,14 @@ done
 %{dracutlibdir}/modules.d/*
 %{_unitdir}/kdump.service
 %{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_libdir}/eppic_makedumpfile.so
 /usr/share/makedumpfile/
 %endif
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_sysconfdir}/makedumpfile.conf.sample
 %endif
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 /usr/sbin/makedumpfile
 %endif
 
@@ -291,11 +301,14 @@ done
 %{_mandir}/man8/mkdumprd.8.gz
 %{_mandir}/man8/vmcore-dmesg.8.gz
 %{_mandir}/man5/*
-%ifarch %{ix86} x86_64 aarch64
+%ifarch %{ix86} x86_64 aarch64 loongarch64
 %{_mandir}/man8/makedumpfile.8.gz
 %endif
 
 %changelog
+* Tue Nov 17 2022 doupengda <doupengda@loongson.cn> - 2.0.23-9
+- add loongarch64 support
+
 * Wed Aug 24 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-8
 - arm64: fix PAGE_OFFSET calc for flipped mm
 
