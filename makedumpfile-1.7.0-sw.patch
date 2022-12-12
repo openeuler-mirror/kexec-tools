@@ -1,0 +1,233 @@
+diff -Naru ./makedumpfile-1.7.0/arch/sw_64.c ./makedumpfile-1.7.0-sw/arch/sw_64.c
+--- ./makedumpfile-1.7.0/arch/sw_64.c	1970-01-01 00:00:00.000000000 +0000
++++ ./makedumpfile-1.7.0-sw/arch/sw_64.c	2022-08-19 06:54:24.938438551 +0000
+@@ -0,0 +1,126 @@
++/*
++ * sw_64.c
++ *
++ * Copyright (C) 2021 Loongson Technology Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation (version 2 of the License).
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++#ifdef __sw_64__
++
++#include "../print_info.h"
++#include "../elf_info.h"
++#include "../makedumpfile.h"
++
++int
++get_phys_base_sw_64(void)
++{
++	info->phys_base = 0ULL;
++
++	DEBUG_MSG("phys_base    : %lx\n", info->phys_base);
++
++	return TRUE;
++}
++
++int
++get_machdep_info_sw_64(void)
++{
++	info->section_size_bits = _SECTION_SIZE_BITS;
++
++	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
++	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
++		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
++	else
++		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
++
++	DEBUG_MSG("max_physmem_bits : %lx\n", info->max_physmem_bits);
++	DEBUG_MSG("section_size_bits: %lx\n", info->section_size_bits);
++
++	return TRUE;
++}
++
++int
++get_versiondep_info_sw_64(void)
++{
++	info->page_offset  = 0x9800000000000000ULL;
++
++	DEBUG_MSG("page_offset : %lx\n", info->page_offset);
++
++	return TRUE;
++}
++
++/*
++ * Translate a virtual address to a physical address by using 3 levels paging.
++ */
++unsigned long long
++vaddr_to_paddr_sw_64(unsigned long vaddr)
++{
++	unsigned long long paddr = NOT_PADDR;
++	pgd_t	*pgda, pgdv;
++	pmd_t	*pmda, pmdv;
++	pte_t 	*ptea, ptev;
++
++	/*
++	 * CKSEG0/CKSEG1
++	 */
++	if (vaddr >= 0xffffffff80000000ULL && vaddr < 0xffffffffc0000000ULL)
++		return vaddr & 0x1fffffffULL;
++
++	/*
++	 * XKPHYS
++	 */
++	if (vaddr >= 0x9000000000000000ULL && vaddr < 0xc000000000000000ULL)
++		return vaddr & ((1ULL << MAX_PHYSMEM_BITS()) - 1);
++
++	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {
++		ERRMSG("Can't get the symbol of swapper_pg_dir.\n");
++		return NOT_PADDR;
++	}
++
++	pgda = pgd_offset(SYMBOL(swapper_pg_dir), vaddr);
++	if (!readmem(PADDR, (unsigned long long)pgda, &pgdv, sizeof(pgdv))) {
++		ERRMSG("Can't read pgd\n");
++		return NOT_PADDR;
++	}
++
++	pmda = pmd_offset(&pgdv, vaddr);
++	if (!readmem(PADDR, (unsigned long long)pmda, &pmdv, sizeof(pmdv))) {
++		ERRMSG("Can't read pmd\n");
++		return NOT_PADDR;
++	}
++
++	switch (pmdv & (_PAGE_PRESENT|_PAGE_HUGE)) {
++	case _PAGE_PRESENT:
++		ptea = pte_offset(&pmdv, vaddr);
++		/* 64k page */
++		if (!readmem(PADDR, (unsigned long long)ptea, &ptev, sizeof(ptev))) {
++			ERRMSG("Can't read pte\n");
++			return NOT_PADDR;
++		}
++
++		if (!(ptev & _PAGE_PRESENT)) {
++			ERRMSG("Can't get a valid pte.\n");
++			return NOT_PADDR;
++		} else {
++			paddr = PAGEBASE(ptev) + (vaddr & (PAGESIZE() - 1));
++		}
++		break;
++	case _PAGE_PRESENT|_PAGE_HUGE:
++		paddr = (pmdv & PMD_MASK) + (vaddr & (PMD_SIZE - 1));
++		break;
++	}
++
++	return paddr;
++}
++
++#endif /* sw_64 */
+diff -Naru ./makedumpfile-1.7.0/makedumpfile.h ./makedumpfile-1.7.0-sw/makedumpfile.h
+--- ./makedumpfile-1.7.0/makedumpfile.h	2021-11-08 00:36:15.000000000 +0000
++++ ./makedumpfile-1.7.0-sw/makedumpfile.h	2022-08-19 07:46:43.093698825 +0000
+@@ -963,7 +963,7 @@
+ 
+ #endif          /* sparc64 */
+ 
+-#ifdef __mips64__ /* mips64 */
++#ifdef __mips64__   /* mips64 */
+ #define KVBASE			PAGE_OFFSET
+ #define _SECTION_SIZE_BITS	(28)
+ #define _MAX_PHYSMEM_BITS	(48)
+@@ -996,6 +996,40 @@
+ 
+ #endif		/* mips64 */
+ 
++#ifdef __sw_64__   /* sw_64 */
++#define KVBASE                  PAGE_OFFSET
++#define _SECTION_SIZE_BITS      (28)
++#define _MAX_PHYSMEM_BITS       (48)
++#define _PAGE_PRESENT           (1 << 0)
++#define _PAGE_HUGE              (1 << 4)
++
++typedef unsigned long pte_t;
++typedef unsigned long pmd_t;
++typedef unsigned long pgd_t;
++
++#define PAGE_MASK               (~(PAGESIZE() - 1))
++#define PMD_MASK                (~(PMD_SIZE - 1))
++#define PMD_SHIFT               ((PAGESHIFT() - 3) * 2 + 3)
++#define PMD_SIZE                (1UL << PMD_SHIFT)
++#define PGDIR_SHIFT             ((PAGESHIFT() - 3) * 3 + 3)
++#define PTRS_PER_PTE            (1 << (PAGESHIFT() - 3))
++#define PTRS_PER_PMD            PTRS_PER_PTE
++#define PTRS_PER_PGD            PTRS_PER_PTE
++
++#define pte_index(vaddr)                (((vaddr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
++#define pmd_page_paddr(pmd)             (pmd & (int32_t)PAGE_MASK)
++#define pte_offset(dir, vaddr)          ((pte_t *)pmd_page_paddr((*dir)) + pte_index(vaddr))
++
++#define pmd_index(vaddr)                (((vaddr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
++#define pgd_page_paddr(pgd)             (pgd & (int32_t)PAGE_MASK)
++#define pmd_offset(pgd, vaddr)          ((pmd_t *)pgd_page_paddr((*pgd)) + pmd_index(vaddr))
++
++#define pgd_index(vaddr)                (((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
++#define pgd_offset(pgdir, vaddr)        ((pgd_t *)(pgdir) + pgd_index(vaddr))
++
++#endif          /* sw_64 */
++
++
+ /*
+  * The function of dependence on machine
+  */
+@@ -1167,6 +1201,23 @@
+ #define arch_crashkernel_mem_size()	stub_false()
+ #endif		/* mips64 */
+ 
++#ifdef __sw_64__ /* sw64 */
++int get_phys_base_sw_64(void);
++int get_machdep_info_sw_64(void);
++int get_versiondep_info_sw_64(void);
++unsigned long long vaddr_to_paddr_sw_64(unsigned long vaddr);
++#define find_vmemmap()          stub_false()
++#define get_phys_base()         get_phys_base_sw_64()
++#define get_machdep_info()      get_machdep_info_sw_64()
++#define get_versiondep_info()   get_versiondep_info_sw_64()
++#define get_kaslr_offset(X)     stub_false()
++#define vaddr_to_paddr(X)       vaddr_to_paddr_sw_64(X)
++#define paddr_to_vaddr(X)       paddr_to_vaddr_general(X)
++#define is_phys_addr(X)         stub_true_ul(X)
++#define arch_crashkernel_mem_size()     stub_false()
++#endif          /* sw_64 */
++
++
+ typedef unsigned long long mdf_pfn_t;
+ 
+ #ifndef ARCH_PFN_OFFSET
+@@ -2301,6 +2352,13 @@
+ #define get_xen_info_arch(X) FALSE
+ #endif	/* mips64 */
+ 
++#ifdef __sw_64__ /* sw_64 */
++#define kvtop_xen(X)    FALSE
++#define get_xen_basic_info_arch(X) FALSE
++#define get_xen_info_arch(X) FALSE
++#endif  /* sw_64 */
++
++
+ struct cycle {
+ 	mdf_pfn_t start_pfn;
+ 	mdf_pfn_t end_pfn;
+diff -Naru ./makedumpfile-1.7.0/Makefile ./makedumpfile-1.7.0-sw/Makefile
+--- ./makedumpfile-1.7.0/Makefile	2021-11-08 00:36:15.000000000 +0000
++++ ./makedumpfile-1.7.0-sw/Makefile	2022-08-19 06:55:54.538591123 +0000
+@@ -47,7 +47,7 @@
+ SRC_BASE = makedumpfile.c makedumpfile.h diskdump_mod.h sadump_mod.h sadump_info.h
+ SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c sadump_info.c cache.c tools.c printk.c
+ OBJ_PART=$(patsubst %.c,%.o,$(SRC_PART))
+-SRC_ARCH = arch/arm.c arch/arm64.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c arch/sparc64.c arch/mips64.c
++SRC_ARCH = arch/arm.c arch/arm64.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c arch/sparc64.c arch/mips64.c arch/sw_64.c
+ OBJ_ARCH=$(patsubst %.c,%.o,$(SRC_ARCH))
+ 
+ LIBS = -ldw -lbz2 -ldl -lelf -lz
