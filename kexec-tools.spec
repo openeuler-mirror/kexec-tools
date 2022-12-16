@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 9
+Release: 10
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -82,7 +82,8 @@ Patch0009:	arm64-fix-PAGE_OFFSET-calc-for-flipped-mm.patch
 Patch0010:      fix-add-64-bit-loongArch-support-1.patch
 Patch0011:      fix-add-64-bit-loongArch-support-2.patch
 %endif
-
+Patch00012:      sw_64.patch
+Patch00013:      makedumpfile-1.7.0-sw.patch
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
 kernel to boot using the kernel's kexec feature either on a
@@ -122,6 +123,12 @@ tar -z -x -v -f %{SOURCE19}
 %patch0011 -p1
 %endif
 
+%ifarch sw_64
+%patch00012 -p1
+%patch00013 -p1
+%endif
+
+
 %build
 autoreconf
 %configure --sbindir=/usr/sbin \
@@ -131,7 +138,7 @@ rm -f kexec-tools.spec.in
 cp %{SOURCE21} %{SOURCE26} %{SOURCE27} .
 
 make
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64  sw_64 loongarch64
 make -C eppic-%{eppic_ver}/libeppic
 make -C makedumpfile-%{mkdf_ver} LINKTYPE=dynamic USELZO=on USESNAPPY=on
 make -C makedumpfile-%{mkdf_ver} LDFLAGS="$LDFLAGS -I../eppic-%{eppic_ver}/libeppic -L../eppic-%{eppic_ver}/libeppic" eppic_makedumpfile.so
@@ -175,7 +182,7 @@ install -m 644 %{SOURCE16} %{buildroot}%{_unitdir}/kdump.service
 install -m 755 -D %{SOURCE22} %{buildroot}%{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
 install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8.gz $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8.gz
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5.gz $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5.gz
@@ -280,14 +287,14 @@ done
 %{dracutlibdir}/modules.d/*
 %{_unitdir}/kdump.service
 %{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 %{_libdir}/eppic_makedumpfile.so
 /usr/share/makedumpfile/
 %endif
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 %{_sysconfdir}/makedumpfile.conf.sample
 %endif
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 /usr/sbin/makedumpfile
 %endif
 
@@ -300,11 +307,14 @@ done
 %{_mandir}/man8/mkdumprd.8.gz
 %{_mandir}/man8/vmcore-dmesg.8.gz
 %{_mandir}/man5/*
-%ifarch %{ix86} x86_64 aarch64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 %{_mandir}/man8/makedumpfile.8.gz
 %endif
 
 %changelog
+* Mon Dec 12 2022 guojiancheng <jiancheng.guo@i-soft.com.cn> - 2.0.23-10
+- Add sw support
+
 * Tue Nov 17 2022 doupengda <doupengda@loongson.cn> - 2.0.23-9
 - add loongarch64 support
 
