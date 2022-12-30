@@ -232,7 +232,8 @@ kdump_setup_ifname() {
 kdump_setup_bridge() {
     local _netdev=$1
     local _brif _dev _mac _kdumpdev
-    for _dev in `ls /sys/class/net/$_netdev/brif/`; do
+    for _dev in /sys/class/net/$_netdev/brif/* ; do
+        [[ -e "$_dev" ]] || break
         _kdumpdev=$_dev
         if kdump_is_bond "$_dev"; then
             kdump_setup_bond "$_dev"
@@ -463,11 +464,11 @@ kdump_install_conf() {
         case "$_opt" in
         raw)
             _pdev=$(persistent_policy="by-id" kdump_get_persistent_dev $_val)
-            sed -i -e "s#^$_opt[[:space:]]\+$_val#$_opt $_pdev#" ${initdir}/tmp/$$-kdump.conf
+            sed -i -e "s#^${_opt}[[:space:]]\+$_val#$_opt $_pdev#" ${initdir}/tmp/$$-kdump.conf
             ;;
         ext[234]|xfs|btrfs|minix)
             _pdev=$(kdump_get_persistent_dev $_val)
-            sed -i -e "s#^$_opt[[:space:]]\+$_val#$_opt $_pdev#" ${initdir}/tmp/$$-kdump.conf
+            sed -i -e "s#^${_opt}[[:space:]]\+$_val#$_opt $_pdev#" ${initdir}/tmp/$$-kdump.conf
             ;;
         ssh|nfs)
             kdump_install_net "$_val"
