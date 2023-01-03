@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 10
+Release: 11
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -312,6 +312,9 @@ done
 %endif
 
 %changelog
+* Fri Dec 30 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-11
+- fix shellcheck error in dracut module setup 
+
 * Mon Dec 12 2022 guojiancheng <jiancheng.guo@i-soft.com.cn> - 2.0.23-10
 - Add sw support
 
