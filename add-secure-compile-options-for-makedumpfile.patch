@@ -12,8 +12,8 @@ Signed-off-by: pengyeqing <pengyeqing@huawei.com>
 
 diff --git a/makedumpfile-1.6.7/Makefile b/makedumpfile-1.6.7/Makefile
 index 612b9d0..180a64f 100644
---- a/makedumpfile-1.7.0/Makefile
-+++ b/makedumpfile-1.7.0/Makefile
+--- a/makedumpfile-1.7.2/Makefile
++++ b/makedumpfile-1.7.2/Makefile
 @@ -10,9 +10,10 @@ endif
  
  CFLAGS_BASE := $(CFLAGS) -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
