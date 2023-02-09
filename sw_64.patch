@@ -1,6 +1,6 @@
-diff -Naru kexec-tools-2.0.23/config/config.guess kexec-tools-2.0.23-sw/config/config.guess
---- kexec-tools-2.0.23/config/config.guess	2020-12-21 08:07:22.000000000 +0000
-+++ kexec-tools-2.0.23-sw/config/config.guess	2022-08-11 02:23:24.056917760 +0000
+diff -Naru kexec-tools-2.0.26/config/config.guess kexec-tools-2.0.26-sw/config/config.guess
+--- kexec-tools-2.0.26/config/config.guess	2020-12-21 08:07:22.000000000 +0000
++++ kexec-tools-2.0.26-sw/config/config.guess	2022-08-11 02:23:24.056917760 +0000
 @@ -937,6 +937,15 @@
  	if test "$?" = 0 ; then LIBC=gnulibc1 ; fi
  	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
@@ -17,9 +17,9 @@ diff -Naru kexec-tools-2.0.23/config/config.guess kexec-tools-2.0.23-sw/config/c
      arc:Linux:*:* | arceb:Linux:*:*)
  	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
  	exit ;;
-diff -Naru kexec-tools-2.0.23/config/config.sub kexec-tools-2.0.23-sw/config/config.sub
---- kexec-tools-2.0.23/config/config.sub	2020-12-21 08:07:22.000000000 +0000
-+++ kexec-tools-2.0.23-sw/config/config.sub	2022-08-11 02:23:50.316917760 +0000
+diff -Naru kexec-tools-2.0.26/config/config.sub kexec-tools-2.0.26-sw/config/config.sub
+--- kexec-tools-2.0.26/config/config.sub	2020-12-21 08:07:22.000000000 +0000
++++ kexec-tools-2.0.26-sw/config/config.sub	2022-08-11 02:23:50.316917760 +0000
 @@ -1158,6 +1158,7 @@
  		case $cpu in
  			1750a | 580 \
@@ -28,12 +28,12 @@ diff -Naru kexec-tools-2.0.23/config/config.sub kexec-tools-2.0.23-sw/config/con
  			| aarch64 | aarch64_be \
  			| abacus \
  			| alpha | alphaev[4-8] | alphaev56 | alphaev6[78] \
-diff -Naru kexec-tools-2.0.23/configure kexec-tools-2.0.23-sw/configure
---- kexec-tools-2.0.23/configure	2021-11-04 14:59:17.000000000 +0000
-+++ kexec-tools-2.0.23-sw/configure	2022-08-18 08:54:34.059090794 +0000
+diff -Naru kexec-tools-2.0.26/configure kexec-tools-2.0.26-sw/configure
+--- kexec-tools-2.0.26/configure	2021-11-04 14:59:17.000000000 +0000
++++ kexec-tools-2.0.26-sw/configure	2022-08-18 08:54:34.059090794 +0000
 @@ -3062,6 +3062,9 @@
- 	hppa*)
- 		ARCH="hppa"
+ 	loongarch*)
+ 		ARCH="loongarch"
  		;;
 +        sw_64*)
 +                ARCH="sw_64"
@@ -41,12 +41,12 @@ diff -Naru kexec-tools-2.0.23/configure kexec-tools-2.0.23-sw/configure
  	* )
  		as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
  		;;
-diff -Naru kexec-tools-2.0.23/configure.ac kexec-tools-2.0.23-sw/configure.ac
---- kexec-tools-2.0.23/configure.ac	2021-11-04 14:57:43.000000000 +0000
-+++ kexec-tools-2.0.23-sw/configure.ac	2022-08-18 08:54:51.039112966 +0000
+diff -Naru kexec-tools-2.0.26/configure.ac kexec-tools-2.0.26-sw/configure.ac
+--- kexec-tools-2.0.26/configure.ac	2021-11-04 14:57:43.000000000 +0000
++++ kexec-tools-2.0.26-sw/configure.ac	2022-08-18 08:54:51.039112966 +0000
 @@ -58,6 +58,9 @@
- 	hppa*)
- 		ARCH="hppa"
+ 	loongarch*)
+ 		ARCH="loongarch"
  		;;
 +        sw_64*)
 +                ARCH="sw_64"
@@ -54,9 +54,9 @@ diff -Naru kexec-tools-2.0.23/configure.ac kexec-tools-2.0.23-sw/configure.ac
  	* )
  		AC_MSG_ERROR([unsupported architecture $target_cpu])
  		;;
-diff -Naru kexec-tools-2.0.23/include/boot/beoboot.h kexec-tools-2.0.23-sw/include/boot/beoboot.h
---- kexec-tools-2.0.23/include/boot/beoboot.h	2010-07-29 09:22:16.000000000 +0000
-+++ kexec-tools-2.0.23-sw/include/boot/beoboot.h	2022-08-11 02:36:05.796917760 +0000
+diff -Naru kexec-tools-2.0.26/include/boot/beoboot.h kexec-tools-2.0.26-sw/include/boot/beoboot.h
+--- kexec-tools-2.0.26/include/boot/beoboot.h	2010-07-29 09:22:16.000000000 +0000
++++ kexec-tools-2.0.26-sw/include/boot/beoboot.h	2022-08-11 02:36:05.796917760 +0000
 @@ -23,6 +23,8 @@
  #define BEOBOOT_ARCH_ALPHA 2
  #define BEOBOOT_ARCH_PPC   3
@@ -75,9 +75,9 @@ diff -Naru kexec-tools-2.0.23/include/boot/beoboot.h kexec-tools-2.0.23-sw/inclu
  #else
  #error Unsupported architecture.
  #endif
-diff -Naru kexec-tools-2.0.23/include/elf.h kexec-tools-2.0.23-sw/include/elf.h
---- kexec-tools-2.0.23/include/elf.h	2020-12-21 08:07:22.000000000 +0000
-+++ kexec-tools-2.0.23-sw/include/elf.h	2022-08-19 01:53:05.572119857 +0000
+diff -Naru kexec-tools-2.0.26/include/elf.h kexec-tools-2.0.26-sw/include/elf.h
+--- kexec-tools-2.0.26/include/elf.h	2020-12-21 08:07:22.000000000 +0000
++++ kexec-tools-2.0.26-sw/include/elf.h	2022-08-19 01:53:05.572119857 +0000
 @@ -266,6 +266,8 @@
     chances of collision with official or non-GNU unofficial values.  */
  
@@ -87,9 +87,9 @@ diff -Naru kexec-tools-2.0.23/include/elf.h kexec-tools-2.0.23-sw/include/elf.h
  
  /* Legal values for e_version (version).  */
  
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.c kexec-tools-2.0.23-sw/kexec/arch/sw_64/crashdump-sw_64.c
---- kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.c	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/crashdump-sw_64.c	2022-08-19 01:50:42.851856092 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/crashdump-sw_64.c kexec-tools-2.0.26-sw/kexec/arch/sw_64/crashdump-sw_64.c
+--- kexec-tools-2.0.26/kexec/arch/sw_64/crashdump-sw_64.c	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/crashdump-sw_64.c	2022-08-19 01:50:42.851856092 +0000
 @@ -0,0 +1,424 @@
 +/*
 + * kexec: Linux boots Linux
@@ -515,9 +515,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.c kexec-tools-2.0
 +{
 +	return parse_iomem_single("Crash kernel\n", start, end);
 +}
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.h kexec-tools-2.0.23-sw/kexec/arch/sw_64/crashdump-sw_64.h
---- kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.h	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/crashdump-sw_64.h	2022-08-18 09:22:23.142660576 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/crashdump-sw_64.h kexec-tools-2.0.26-sw/kexec/arch/sw_64/crashdump-sw_64.h
+--- kexec-tools-2.0.26/kexec/arch/sw_64/crashdump-sw_64.h	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/crashdump-sw_64.h	2022-08-18 09:22:23.142660576 +0000
 @@ -0,0 +1,23 @@
 +#ifndef CRASHDUMP_SW_64_H
 +#define CRASHDUMP_SW_64_H
@@ -542,9 +542,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/crashdump-sw_64.h kexec-tools-2.0
 +
 +extern struct arch_options_t arch_options;
 +#endif /* CRASHDUMP_SW_64_H */
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/include/arch/options.h kexec-tools-2.0.23-sw/kexec/arch/sw_64/include/arch/options.h
---- kexec-tools-2.0.23/kexec/arch/sw_64/include/arch/options.h	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/include/arch/options.h	2022-08-19 01:48:57.131660708 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/include/arch/options.h kexec-tools-2.0.26-sw/kexec/arch/sw_64/include/arch/options.h
+--- kexec-tools-2.0.26/kexec/arch/sw_64/include/arch/options.h	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/include/arch/options.h	2022-08-19 01:48:57.131660708 +0000
 @@ -0,0 +1,30 @@
 +#ifndef KEXEC_ARCH_SW_64_OPTIONS_H
 +#define KEXEC_ARCH_SW_64_OPTIONS_H
@@ -576,9 +576,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/include/arch/options.h kexec-tool
 +#define KEXEC_ALL_OPT_STR KEXEC_ARCH_OPT_STR
 +
 +#endif /* KEXEC_ARCH_SW_64_OPTIONS_H */
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-rel-sw_64.c kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-elf-rel-sw_64.c
---- kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-rel-sw_64.c	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-elf-rel-sw_64.c	2022-08-19 01:51:21.131926839 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/kexec-elf-rel-sw_64.c kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-elf-rel-sw_64.c
+--- kexec-tools-2.0.26/kexec/arch/sw_64/kexec-elf-rel-sw_64.c	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-elf-rel-sw_64.c	2022-08-19 01:51:21.131926839 +0000
 @@ -0,0 +1,46 @@
 +/*
 + * kexec-elf-rel-mips.c - kexec Elf relocation routines
@@ -626,9 +626,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-rel-sw_64.c kexec-tools
 +	}
 +	return;
 +}
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-sw_64.c kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-elf-sw_64.c
---- kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-sw_64.c	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-elf-sw_64.c	2022-08-18 09:19:10.592068959 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/kexec-elf-sw_64.c kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-elf-sw_64.c
+--- kexec-tools-2.0.26/kexec/arch/sw_64/kexec-elf-sw_64.c	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-elf-sw_64.c	2022-08-18 09:19:10.592068959 +0000
 @@ -0,0 +1,189 @@
 +/*
 + * kexec-elf-mips.c - kexec Elf loader for mips
@@ -819,9 +819,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-elf-sw_64.c kexec-tools-2.0
 +	return 0;
 +}
 +
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.c kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-sw_64.c
---- kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.c	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-sw_64.c	2022-08-18 09:15:28.891539590 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/kexec-sw_64.c kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-sw_64.c
+--- kexec-tools-2.0.26/kexec/arch/sw_64/kexec-sw_64.c	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-sw_64.c	2022-08-18 09:15:28.891539590 +0000
 @@ -0,0 +1,175 @@
 +/*
 + * kexec-sw_64.c - kexec for sw_64
@@ -998,9 +998,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.c kexec-tools-2.0.23-
 +				    buf_min, buf_max, buf_end, 1);
 +}
 +
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.h kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-sw_64.h
---- kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.h	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/kexec-sw_64.h	2022-08-18 09:10:51.790877939 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/kexec-sw_64.h kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-sw_64.h
+--- kexec-tools-2.0.26/kexec/arch/sw_64/kexec-sw_64.h	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/kexec-sw_64.h	2022-08-18 09:10:51.790877939 +0000
 @@ -0,0 +1,30 @@
 +#ifndef KEXEC_SW_64_H
 +#define KEXEC_SW_64_H
@@ -1032,9 +1032,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/kexec-sw_64.h kexec-tools-2.0.23-
 +extern off_t initrd_base, initrd_size;
 +
 +#endif /* KEXEC_SW_64_H */
-diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/Makefile kexec-tools-2.0.23-sw/kexec/arch/sw_64/Makefile
---- kexec-tools-2.0.23/kexec/arch/sw_64/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/arch/sw_64/Makefile	2022-08-18 09:47:30.207054276 +0000
+diff -Naru kexec-tools-2.0.26/kexec/arch/sw_64/Makefile kexec-tools-2.0.26-sw/kexec/arch/sw_64/Makefile
+--- kexec-tools-2.0.26/kexec/arch/sw_64/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/arch/sw_64/Makefile	2022-08-18 09:47:30.207054276 +0000
 @@ -0,0 +1,29 @@
 +#
 +# kexec sw_64 (linux booting linux)
@@ -1065,9 +1065,9 @@ diff -Naru kexec-tools-2.0.23/kexec/arch/sw_64/Makefile kexec-tools-2.0.23-sw/ke
 +	kexec/arch/sw_64/kexec-sw_64.h					\
 +	kexec/arch/sw_64/crashdump-sw_64.h				\
 +	kexec/arch/sw_64/include/arch/options.h
-diff -Naru kexec-tools-2.0.23/kexec/kexec-syscall.h kexec-tools-2.0.23-sw/kexec/kexec-syscall.h
---- kexec-tools-2.0.23/kexec/kexec-syscall.h	2020-12-21 08:07:22.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/kexec-syscall.h	2022-08-18 08:44:14.408402498 +0000
+diff -Naru kexec-tools-2.0.26/kexec/kexec-syscall.h kexec-tools-2.0.26-sw/kexec/kexec-syscall.h
+--- kexec-tools-2.0.26/kexec/kexec-syscall.h	2020-12-21 08:07:22.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/kexec-syscall.h	2022-08-18 08:44:14.408402498 +0000
 @@ -51,6 +51,9 @@
  #ifdef __alpha__
  #define __NR_kexec_load                448
@@ -1078,20 +1078,20 @@ diff -Naru kexec-tools-2.0.23/kexec/kexec-syscall.h kexec-tools-2.0.23-sw/kexec/
  #ifndef __NR_kexec_load
  #error Unknown processor architecture.  Needs a kexec_load syscall number.
  #endif
-diff -Naru kexec-tools-2.0.23/kexec/Makefile kexec-tools-2.0.23-sw/kexec/Makefile
---- kexec-tools-2.0.23/kexec/Makefile	2021-10-20 09:58:49.000000000 +0000
-+++ kexec-tools-2.0.23-sw/kexec/Makefile	2022-08-18 08:43:24.548411617 +0000
+diff -Naru kexec-tools-2.0.26/kexec/Makefile kexec-tools-2.0.26-sw/kexec/Makefile
+--- kexec-tools-2.0.26/kexec/Makefile	2021-10-20 09:58:49.000000000 +0000
++++ kexec-tools-2.0.26-sw/kexec/Makefile	2022-08-18 08:43:24.548411617 +0000
 @@ -92,6 +92,7 @@
- include $(srcdir)/kexec/arch/sh/Makefile
  include $(srcdir)/kexec/arch/x86_64/Makefile
  include $(srcdir)/kexec/arch/hppa/Makefile
+ include $(srcdir)/kexec/arch/loongarch/Makefile
 +include $(srcdir)/kexec/arch/sw_64/Makefile
  
  KEXEC_SRCS += $($(ARCH)_KEXEC_SRCS)
  
-diff -Naru kexec-tools-2.0.23/purgatory/arch/sw_64/Makefile kexec-tools-2.0.23-sw/purgatory/arch/sw_64/Makefile
---- kexec-tools-2.0.23/purgatory/arch/sw_64/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ kexec-tools-2.0.23-sw/purgatory/arch/sw_64/Makefile	2022-08-11 02:32:23.036917760 +0000
+diff -Naru kexec-tools-2.0.26/purgatory/arch/sw_64/Makefile kexec-tools-2.0.26-sw/purgatory/arch/sw_64/Makefile
+--- kexec-tools-2.0.26/purgatory/arch/sw_64/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ kexec-tools-2.0.26-sw/purgatory/arch/sw_64/Makefile	2022-08-11 02:32:23.036917760 +0000
 @@ -0,0 +1,8 @@
 +#
 +# Purgatory sw_64
@@ -1101,13 +1101,13 @@ diff -Naru kexec-tools-2.0.23/purgatory/arch/sw_64/Makefile kexec-tools-2.0.23-s
 +
 +dist += purgatory/arch/sw_64/Makefile $(sw_64_PURGATORY_SRCS)
 +
-diff -Naru kexec-tools-2.0.23/purgatory/Makefile kexec-tools-2.0.23-sw/purgatory/Makefile
---- kexec-tools-2.0.23/purgatory/Makefile	2020-12-21 08:07:22.000000000 +0000
-+++ kexec-tools-2.0.23-sw/purgatory/Makefile	2022-08-18 08:45:08.208392658 +0000
+diff -Naru kexec-tools-2.0.26/purgatory/Makefile kexec-tools-2.0.26-sw/purgatory/Makefile
+--- kexec-tools-2.0.26/purgatory/Makefile	2020-12-21 08:07:22.000000000 +0000
++++ kexec-tools-2.0.26-sw/purgatory/Makefile	2022-08-18 08:45:08.208392658 +0000
 @@ -28,6 +28,7 @@
- include $(srcdir)/purgatory/arch/s390/Makefile
  include $(srcdir)/purgatory/arch/sh/Makefile
  include $(srcdir)/purgatory/arch/x86_64/Makefile
+ include $(srcdir)/purgatory/arch/loongarch/Makefile
 +include $(srcdir)/purgatory/arch/sw_64/Makefile
  
  PURGATORY_SRCS+=$($(ARCH)_PURGATORY_SRCS)

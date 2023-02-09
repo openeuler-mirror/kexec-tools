@@ -1,10 +1,10 @@
 %global eppic_ver e8844d3793471163ae4a56d8f95897be9e5bd554
 %global eppic_shortver %(c=%{eppic_ver}; echo ${c:0:7})
-%global mkdf_ver 1.7.0
+%global mkdf_ver 1.7.2
 
 Name: kexec-tools
-Version: 2.0.23
-Release: 11
+Version: 2.0.26
+Release: 1
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -69,21 +69,15 @@ Requires:       systemd-udev%{?_isa}
 
 %undefine _hardened_build
 
-Patch0001:	arm64-support-more-than-one-crash-kernel-regions.patch
-Patch0002:	add-secure-compile-options-for-makedumpfile.patch
-Patch0003:	kexec-Add-quick-kexec-support.patch
-Patch0004:	kexec-Quick-kexec-implementation-for-arm64.patch
-Patch0005:	arm64-crashdump-deduce-paddr-of-_text-based-on-kerne.patch
-Patch0006:	arm64-make-phys_offset-signed.patch
-Patch0007:	arm64-crashdump-unify-routine-to-get-page_offset.patch
-Patch0008:	arm64-read-VA_BITS-from-kcore-for-52-bits-VA-kernel.patch
-Patch0009:	arm64-fix-PAGE_OFFSET-calc-for-flipped-mm.patch
-%ifarch loongarch64
-Patch0010:      fix-add-64-bit-loongArch-support-1.patch
-Patch0011:      fix-add-64-bit-loongArch-support-2.patch
+Patch0001:	add-secure-compile-options-for-makedumpfile.patch
+Patch0002:	kexec-Add-quick-kexec-support.patch
+Patch0003:	kexec-Quick-kexec-implementation-for-arm64.patch
+
+%ifarch sw_64
+Patch0004:	sw_64.patch
+Patch0005:	makedumpfile-1.7.2-sw.patch
 %endif
-Patch00012:      sw_64.patch
-Patch00013:      makedumpfile-1.7.0-sw.patch
+
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
 kernel to boot using the kernel's kexec feature either on a
@@ -105,30 +99,7 @@ mkdir -p -m755 kcp
 tar -z -x -v -f %{SOURCE9}
 tar -z -x -v -f %{SOURCE19}
 
-%ifarch aarch64
-%patch0001 -p1
-%endif
-%patch0002 -p1
-%patch0003 -p1
-%ifarch aarch64
-%patch0004 -p1
-%endif
-%patch0005 -p1
-%patch0006 -p1
-%patch0007 -p1
-%patch0008 -p1
-%patch0009 -p1
-
-%ifarch loongarch64
-%patch0010 -p1
-%patch0011 -p1
-%endif
-
-%ifarch sw_64
-%patch00012 -p1
-%patch00013 -p1
-%endif
-
+%autopatch -p1
 
 %build
 autoreconf
@@ -185,8 +156,8 @@ install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 
 %ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
-install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8.gz $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8.gz
-install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5.gz $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5.gz
+install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8 $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8
+install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5 $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf $RPM_BUILD_ROOT/%{_sysconfdir}/makedumpfile.conf.sample
 install -m 755 makedumpfile-%{mkdf_ver}/eppic_makedumpfile.so $RPM_BUILD_ROOT/%{_libdir}/eppic_makedumpfile.so
 mkdir -p $RPM_BUILD_ROOT/usr/share/makedumpfile/eppic_scripts/
@@ -313,6 +284,9 @@ done
 %endif
 
 %changelog
+* Mon Jan 30 2023 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.26-1
+- update to kexec-tools-2.0.26.1
+
 * Fri Dec 30 2022 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.23-11
 - fix shellcheck error in dracut module setup 
 

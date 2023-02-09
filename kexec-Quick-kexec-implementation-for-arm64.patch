@@ -17,10 +17,10 @@ index 45d7953..f283f50 100644
 --- a/kexec/arch/arm64/iomem.h
 +++ b/kexec/arch/arm64/iomem.h
 @@ -7,5 +7,6 @@
- #define CRASH_KERNEL_LOW	"Crash kernel (low)\n"
+ #define KERNEL_DATA		"Kernel data\n"
  #define CRASH_KERNEL		"Crash kernel\n"
  #define IOMEM_RESERVED		"reserved\n"
-+#define QUICK_KEXEC             "Quick kexec\n"
++#define QUICK_KEXEC		"Quick kexec\n"
  
  #endif
 diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
@@ -92,12 +92,12 @@ index 219ec49..8a3bb69 100644
  	else
  		hole_max = ULONG_MAX;
  
-@@ -944,7 +959,8 @@ static bool to_be_excluded(char *str)
+@@ -1050,7 +1050,8 @@ static bool to_be_excluded(char *str, unsigned long long start, unsigned long lo
+ 
  	if (!strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) ||
  	    !strncmp(str, KERNEL_CODE, strlen(KERNEL_CODE)) ||
- 	    !strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) ||
--	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)))
-+	    !strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) ||
+-	    !strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)))
++	    !strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) ||
 +	    !strncmp(str, QUICK_KEXEC, strlen(QUICK_KEXEC)))
  		return false;
  	else
