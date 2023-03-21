@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.23
-Release: 10
+Release: 11
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -78,12 +78,10 @@ Patch0006:	arm64-make-phys_offset-signed.patch
 Patch0007:	arm64-crashdump-unify-routine-to-get-page_offset.patch
 Patch0008:	arm64-read-VA_BITS-from-kcore-for-52-bits-VA-kernel.patch
 Patch0009:	arm64-fix-PAGE_OFFSET-calc-for-flipped-mm.patch
-%ifarch loongarch64
-Patch0010:      fix-add-64-bit-loongArch-support-1.patch
-Patch0011:      fix-add-64-bit-loongArch-support-2.patch
-%endif
-Patch00012:      sw_64.patch
-Patch00013:      makedumpfile-1.7.0-sw.patch
+Patch00010:	sw_64.patch
+Patch00011:	makedumpfile-1.7.0-sw.patch
+Patch00012:	kexec-add-loongarch64-support.patch
+Patch00013:	add-loongarch64-support-for-makedumpfile.patch
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
 kernel to boot using the kernel's kexec feature either on a
@@ -118,15 +116,11 @@ tar -z -x -v -f %{SOURCE19}
 %patch0008 -p1
 %patch0009 -p1
 
-%ifarch loongarch64
 %patch0010 -p1
 %patch0011 -p1
-%endif
 
-%ifarch sw_64
 %patch00012 -p1
 %patch00013 -p1
-%endif
 
 
 %build
@@ -312,6 +306,9 @@ done
 %endif
 
 %changelog
+* Tue Mar 21 2023 Youling Tang <tangyouling@loongson.cn> - 2.0.23-11
+- Reimplement loongarch64 support.
+
 * Mon Dec 12 2022 guojiancheng <jiancheng.guo@i-soft.com.cn> - 2.0.23-10
 - Add sw support
 
