@@ -1,0 +1,1477 @@
+From c969d18e44f06b807029bfe0d354a5a6857c4f96 Mon Sep 17 00:00:00 2001
+From: Youling Tang <tangyouling@loongson.cn>
+Date: Mon, 20 Mar 2023 10:49:36 +0800
+Subject: [PATCH] Add loongarch64 support
+
+Signed-off-by: Youling Tang <tangyouling@loongson.cn>
+---
+ config/config.guess                           |   3 +
+ config/config.sub                             |   1 +
+ configure                                     |   3 +
+ configure.ac                                  |   3 +
+ include/elf.h                                 |   1 +
+ include/image.h                               |   1 +
+ kexec/Makefile                                |   1 +
+ kexec/arch/loongarch/Makefile                 |  22 +
+ kexec/arch/loongarch/crashdump-loongarch.c    | 220 ++++++++++
+ kexec/arch/loongarch/crashdump-loongarch.h    |  26 ++
+ kexec/arch/loongarch/image-header.h           |  79 ++++
+ kexec/arch/loongarch/include/arch/options.h   |  28 ++
+ kexec/arch/loongarch/iomem.h                  |  10 +
+ kexec/arch/loongarch/kexec-elf-loongarch.c    | 129 ++++++
+ .../arch/loongarch/kexec-elf-rel-loongarch.c  |  42 ++
+ kexec/arch/loongarch/kexec-loongarch.c        | 397 ++++++++++++++++++
+ kexec/arch/loongarch/kexec-loongarch.h        |  60 +++
+ kexec/arch/loongarch/kexec-pei-loongarch.c    | 124 ++++++
+ kexec/kexec-syscall.h                         |   9 +-
+ kexec/kexec.c                                 |   2 +-
+ kexec/kexec.h                                 |   1 +
+ purgatory/Makefile                            |   1 +
+ purgatory/arch/loongarch/Makefile             |  10 +
+ purgatory/arch/loongarch/console-loongarch.c  |   7 +
+ .../arch/loongarch/purgatory-loongarch.c      |   7 +
+ .../arch/loongarch/purgatory-loongarch.h      |   6 +
+ 26 files changed, 1191 insertions(+), 2 deletions(-)
+ create mode 100644 kexec/arch/loongarch/Makefile
+ create mode 100644 kexec/arch/loongarch/crashdump-loongarch.c
+ create mode 100644 kexec/arch/loongarch/crashdump-loongarch.h
+ create mode 100644 kexec/arch/loongarch/image-header.h
+ create mode 100644 kexec/arch/loongarch/include/arch/options.h
+ create mode 100644 kexec/arch/loongarch/iomem.h
+ create mode 100644 kexec/arch/loongarch/kexec-elf-loongarch.c
+ create mode 100644 kexec/arch/loongarch/kexec-elf-rel-loongarch.c
+ create mode 100644 kexec/arch/loongarch/kexec-loongarch.c
+ create mode 100644 kexec/arch/loongarch/kexec-loongarch.h
+ create mode 100644 kexec/arch/loongarch/kexec-pei-loongarch.c
+ create mode 100644 purgatory/arch/loongarch/Makefile
+ create mode 100644 purgatory/arch/loongarch/console-loongarch.c
+ create mode 100644 purgatory/arch/loongarch/purgatory-loongarch.c
+ create mode 100644 purgatory/arch/loongarch/purgatory-loongarch.h
+
+diff --git a/config/config.guess b/config/config.guess
+index 183653d..9b863dd 100755
+--- a/config/config.guess
++++ b/config/config.guess
+@@ -992,6 +992,9 @@ EOF
+     k1om:Linux:*:*)
+ 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
+ 	exit ;;
++    loongarch32:Linux:*:* | loongarch64:Linux:*:* | loongarchx32:Linux:*:*)
++	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
++	exit ;;
+     m32r*:Linux:*:*)
+ 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
+ 	exit ;;
+diff --git a/config/config.sub b/config/config.sub
+index ca63c8c..1a5ab38 100755
+--- a/config/config.sub
++++ b/config/config.sub
+@@ -1186,6 +1186,7 @@ case $cpu-$vendor in
+ 			| k1om \
+ 			| le32 | le64 \
+ 			| lm32 \
++			| loongarch32 | loongarch64 | loongarchx32 \
+ 			| m32c | m32r | m32rle \
+ 			| m5200 | m68000 | m680[012346]0 | m68360 | m683?2 | m68k \
+ 			| m6811 | m68hc11 | m6812 | m68hc12 | m68hcs12x \
+diff --git a/configure b/configure
+index 3cfc954..7e9bc6f 100755
+--- a/configure
++++ b/configure
+@@ -3065,6 +3065,9 @@ case $target_cpu in
+         sw_64*)
+                 ARCH="sw_64"
+                 ;;
++        loongarch*)
++                ARCH="loongarch"
++                ;;
+ 	* )
+ 		as_fn_error $? "unsupported architecture $target_cpu" "$LINENO" 5
+ 		;;
+diff --git a/configure.ac b/configure.ac
+index 0a8a5fb..f40e96e 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -58,6 +58,9 @@ case $target_cpu in
+ 	hppa*)
+ 		ARCH="hppa"
+ 		;;
++	loongarch*)
++		ARCH="loongarch"
++		;;
+         sw_64*)
+                 ARCH="sw_64"
+                 ;;
+diff --git a/include/elf.h b/include/elf.h
+index 390fc91..9b6fafb 100644
+--- a/include/elf.h
++++ b/include/elf.h
+@@ -259,6 +259,7 @@ typedef struct
+ #define EM_ARC_A5	93		/* ARC Cores Tangent-A5 */
+ #define EM_XTENSA	94		/* Tensilica Xtensa Architecture */
+ #define EM_AARCH64	183		/* ARM AARCH64 */
++#define EM_LOONGARCH	258		/* Loongson Loongarch*/
+ #define EM_NUM		184
+ 
+ /* If it is necessary to assign new unofficial EM_* values, please
+diff --git a/include/image.h b/include/image.h
+index 8e9d81e..7a4bccf 100644
+--- a/include/image.h
++++ b/include/image.h
+@@ -86,6 +86,7 @@
+ #define IH_ARCH_ARC		23	/* Synopsys DesignWare ARC */
+ #define IH_ARCH_X86_64		24	/* AMD x86_64, Intel and Via */
+ #define IH_ARCH_XTENSA		25	/* Xtensa       */
++#define IH_ARCH_LOONGARCH	26	/* LoongArch Loongson */
+ 
+ /*
+  * Image Types
+diff --git a/kexec/Makefile b/kexec/Makefile
+index 7d2544b..3416ca6 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -92,6 +92,7 @@ include $(srcdir)/kexec/arch/s390/Makefile
+ include $(srcdir)/kexec/arch/sh/Makefile
+ include $(srcdir)/kexec/arch/x86_64/Makefile
+ include $(srcdir)/kexec/arch/hppa/Makefile
++include $(srcdir)/kexec/arch/loongarch/Makefile
+ include $(srcdir)/kexec/arch/sw_64/Makefile
+ 
+ KEXEC_SRCS += $($(ARCH)_KEXEC_SRCS)
+diff --git a/kexec/arch/loongarch/Makefile b/kexec/arch/loongarch/Makefile
+new file mode 100644
+index 0000000..3b33b96
+--- /dev/null
++++ b/kexec/arch/loongarch/Makefile
+@@ -0,0 +1,22 @@
++#
++# kexec loongarch (linux booting linux)
++#
++loongarch_KEXEC_SRCS =  kexec/arch/loongarch/kexec-loongarch.c
++loongarch_KEXEC_SRCS += kexec/arch/loongarch/kexec-elf-loongarch.c
++loongarch_KEXEC_SRCS += kexec/arch/loongarch/kexec-pei-loongarch.c
++loongarch_KEXEC_SRCS += kexec/arch/loongarch/kexec-elf-rel-loongarch.c
++loongarch_KEXEC_SRCS += kexec/arch/loongarch/crashdump-loongarch.c
++
++loongarch_MEM_REGIONS = kexec/mem_regions.c
++
++loongarch_CPPFLAGS += -I $(srcdir)/kexec/
++
++loongarch_ADD_BUFFER =
++loongarch_ADD_SEGMENT =
++loongarch_VIRT_TO_PHYS =
++
++dist += kexec/arch/loongarch/Makefile $(loongarch_KEXEC_SRCS)			\
++	kexec/arch/loongarch/kexec-loongarch.h					\
++	kexec/arch/loongarch/image-header.h					\
++	kexec/arch/loongarch/crashdump-loongarch.h				\
++	kexec/arch/loongarch/include/arch/options.h
+diff --git a/kexec/arch/loongarch/crashdump-loongarch.c b/kexec/arch/loongarch/crashdump-loongarch.c
+new file mode 100644
+index 0000000..81250e4
+--- /dev/null
++++ b/kexec/arch/loongarch/crashdump-loongarch.c
+@@ -0,0 +1,220 @@
++/*
++ * LoongArch crashdump.
++ *
++ * Copyright (C) 2022 Loongson Technology Corporation Limited.
++ *   Youling Tang <tangyouling@loongson.cn>
++ *
++ * derived from crashdump-arm64.c
++ *
++ * This source code is licensed under the GNU General Public License,
++ * Version 2.  See the file COPYING for more details.
++ */
++
++#define _GNU_SOURCE
++
++#include <errno.h>
++#include <linux/elf.h>
++
++#include "kexec.h"
++#include "crashdump.h"
++#include "crashdump-loongarch.h"
++#include "iomem.h"
++#include "kexec-loongarch.h"
++#include "kexec-elf.h"
++#include "mem_regions.h"
++
++/* memory ranges of crashed kernel */
++static struct memory_ranges system_memory_rgns;
++
++/* memory range reserved for crashkernel */
++struct memory_range crash_reserved_mem[CRASH_MAX_RESERVED_RANGES];
++struct memory_ranges usablemem_rgns = {
++	.size = 0,
++	.max_size = CRASH_MAX_RESERVED_RANGES,
++	.ranges = crash_reserved_mem,
++};
++
++struct memory_range elfcorehdr_mem;
++
++static struct crash_elf_info elf_info64 = {
++	.class		= ELFCLASS64,
++	.data		= ELFDATA2LSB,
++	.machine	= EM_LOONGARCH,
++	.page_offset	= PAGE_OFFSET,
++};
++
++/*
++ * iomem_range_callback() - callback called for each iomem region
++ * @data: not used
++ * @nr: not used
++ * @str: name of the memory region
++ * @base: start address of the memory region
++ * @length: size of the memory region
++ *
++ * This function is called once for each memory region found in /proc/iomem.
++ * It locates system RAM and crashkernel reserved memory and places these to
++ * variables, respectively, system_memory_rgns and usablemem_rgns.
++ */
++
++static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
++				char *str, unsigned long long base,
++				unsigned long long length)
++{
++	if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0)
++		return mem_regions_alloc_and_add(&usablemem_rgns,
++						base, length, RANGE_RAM);
++	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0)
++		return mem_regions_alloc_and_add(&system_memory_rgns,
++						base, length, RANGE_RAM);
++	else if (strncmp(str, KERNEL_CODE, strlen(KERNEL_CODE)) == 0)
++		elf_info64.kern_paddr_start = base;
++	else if (strncmp(str, KERNEL_DATA, strlen(KERNEL_DATA)) == 0)
++		elf_info64.kern_size = base + length - elf_info64.kern_paddr_start;
++
++	return 0;
++}
++
++int is_crashkernel_mem_reserved(void)
++{
++	if (!usablemem_rgns.size)
++		kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
++
++	return usablemem_rgns.size;
++}
++
++/*
++ * crash_get_memory_ranges() - read system physical memory
++ *
++ * Function reads through system physical memory and stores found memory
++ * regions in system_memory_ranges.
++ * Regions are sorted in ascending order.
++ *
++ * Returns 0 in case of success and a negative value otherwise.
++ */
++static int crash_get_memory_ranges(void)
++{
++	int i;
++
++	/*
++	 * First read all memory regions that can be considered as
++	 * system memory including the crash area.
++	 */
++	if (!usablemem_rgns.size)
++		kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
++
++	/* allow one or two regions for crash dump kernel */
++	if (!usablemem_rgns.size)
++		return -EINVAL;
++
++	dbgprint_mem_range("Reserved memory range",
++			usablemem_rgns.ranges, usablemem_rgns.size);
++
++	for (i = 0; i < usablemem_rgns.size; i++) {
++		if (mem_regions_alloc_and_exclude(&system_memory_rgns,
++					&crash_reserved_mem[i])) {
++			fprintf(stderr, "Cannot allocate memory for ranges\n");
++			return -ENOMEM;
++		}
++	}
++
++	/*
++	 * Make sure that the memory regions are sorted.
++	 */
++	mem_regions_sort(&system_memory_rgns);
++
++	dbgprint_mem_range("Coredump memory ranges",
++			   system_memory_rgns.ranges, system_memory_rgns.size);
++
++	/*
++	 * For additional kernel code/data segment.
++	 * kern_paddr_start/kern_size are determined in iomem_range_callback
++	 */
++	elf_info64.kern_vaddr_start = get_kernel_sym("_text");
++	if (!elf_info64.kern_vaddr_start)
++		elf_info64.kern_vaddr_start = UINT64_MAX;
++
++	return 0;
++}
++
++/*
++ * load_crashdump_segments() - load the elf core header
++ * @info: kexec info structure
++ *
++ * This function creates and loads an additional segment of elf core header
++ : which is used to construct /proc/vmcore on crash dump kernel.
++ *
++ * Return 0 in case of success and -1 in case of error.
++ */
++
++int load_crashdump_segments(struct kexec_info *info)
++{
++	unsigned long elfcorehdr;
++	unsigned long bufsz;
++	void *buf;
++	int err;
++
++	/*
++	 * First fetch all the memory (RAM) ranges that we are going to
++	 * pass to the crash dump kernel during panic.
++	 */
++
++	err = crash_get_memory_ranges();
++
++	if (err)
++		return EFAILED;
++
++	err = crash_create_elf64_headers(info, &elf_info64,
++			system_memory_rgns.ranges, system_memory_rgns.size,
++			&buf, &bufsz, ELF_CORE_HEADER_ALIGN);
++
++	if (err)
++		return EFAILED;
++
++	elfcorehdr = add_buffer(info, buf, bufsz, bufsz, 1024,
++		crash_reserved_mem[usablemem_rgns.size - 1].start,
++		crash_reserved_mem[usablemem_rgns.size - 1].end, -1);
++
++	elfcorehdr_mem.start = elfcorehdr;
++	elfcorehdr_mem.end = elfcorehdr + bufsz - 1;
++
++	dbgprintf("%s: elfcorehdr 0x%llx-0x%llx\n", __func__,
++			elfcorehdr_mem.start, elfcorehdr_mem.end);
++
++	return 0;
++}
++
++/*
++ * e_entry and p_paddr are actually in virtual address space.
++ * Those values will be translated to physcal addresses by using
++ * virt_to_phys() in add_segment().
++ * So let's fix up those values for later use so the memory base will be
++ * correctly replaced with crash_reserved_mem[usablemem_rgns.size - 1].start.
++ */
++void fixup_elf_addrs(struct mem_ehdr *ehdr)
++{
++	struct mem_phdr *phdr;
++	int i;
++
++	ehdr->e_entry += crash_reserved_mem[usablemem_rgns.size - 1].start;
++
++	for (i = 0; i < ehdr->e_phnum; i++) {
++		phdr = &ehdr->e_phdr[i];
++		if (phdr->p_type != PT_LOAD)
++			continue;
++		phdr->p_paddr += crash_reserved_mem[usablemem_rgns.size - 1].start;
++	}
++}
++
++int get_crash_kernel_load_range(uint64_t *start, uint64_t *end)
++{
++	if (!usablemem_rgns.size)
++		kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
++
++	if (!usablemem_rgns.size)
++		return -1;
++
++	*start = crash_reserved_mem[usablemem_rgns.size - 1].start;
++	*end = crash_reserved_mem[usablemem_rgns.size - 1].end;
++
++	return 0;
++}
+diff --git a/kexec/arch/loongarch/crashdump-loongarch.h b/kexec/arch/loongarch/crashdump-loongarch.h
+new file mode 100644
+index 0000000..25ff24b
+--- /dev/null
++++ b/kexec/arch/loongarch/crashdump-loongarch.h
+@@ -0,0 +1,26 @@
++#ifndef CRASHDUMP_LOONGARCH_H
++#define CRASHDUMP_LOONGARCH_H
++
++struct kexec_info;
++extern struct memory_ranges usablemem_rgns;
++extern struct memory_range crash_reserved_mem[];
++extern struct memory_range elfcorehdr_mem;
++
++int load_crashdump_segments(struct kexec_info *info);
++int is_crashkernel_mem_reserved(void);
++void fixup_elf_addrs(struct mem_ehdr *ehdr);
++int get_crash_kernel_load_range(uint64_t *start, uint64_t *end);
++
++#define PAGE_OFFSET	0x9000000000000000ULL
++#define MAXMEM		0
++
++#define CRASH_MAX_MEMMAP_NR	(KEXEC_MAX_SEGMENTS + 1)
++#define CRASH_MAX_MEMORY_RANGES	(MAX_MEMORY_RANGES + 2)
++
++/* crash dump kernel support at most two regions, low_region and high region. */
++#define CRASH_MAX_RESERVED_RANGES      2
++
++#define COMMAND_LINE_SIZE	512
++
++extern struct arch_options_t arch_options;
++#endif /* CRASHDUMP_LOONGARCH_H */
+diff --git a/kexec/arch/loongarch/image-header.h b/kexec/arch/loongarch/image-header.h
+new file mode 100644
+index 0000000..3b75765
+--- /dev/null
++++ b/kexec/arch/loongarch/image-header.h
+@@ -0,0 +1,79 @@
++/*
++ * LoongArch binary image header.
++ */
++
++#if !defined(__LOONGARCH_IMAGE_HEADER_H)
++#define __LOONGARCH_IMAGE_HEADER_H
++
++#include <endian.h>
++#include <stdint.h>
++
++/**
++ * struct loongarch_image_header
++ *
++ * @pe_sig: Optional PE format 'MZ' signature.
++ * @reserved_1: Reserved.
++ * @kernel_entry: Kernel image entry pointer.
++ * @image_size: An estimated size of the memory image size in LSB byte order.
++ * @text_offset: The image load offset in LSB byte order.
++ * @reserved_2: Reserved.
++ * @reserved_3: Reserved.
++ * @pe_header: Optional offset to a PE format header.
++ **/
++
++struct loongarch_image_header {
++	uint8_t pe_sig[2];
++	uint16_t reserved_1[3];
++	uint64_t kernel_entry;
++	uint64_t image_size;
++	uint64_t text_offset;
++	uint64_t reserved_2[3];
++	uint32_t reserved_3;
++	uint32_t pe_header;
++};
++
++static const uint8_t loongarch_image_pe_sig[2] = {'M', 'Z'};
++
++/**
++ * loongarch_header_check_pe_sig - Helper to check the loongarch image header.
++ *
++ * Returns non-zero if 'MZ' signature is found.
++ */
++
++static inline int loongarch_header_check_pe_sig(const struct loongarch_image_header *h)
++{
++	if (!h)
++		return 0;
++
++	return (h->pe_sig[0] == loongarch_image_pe_sig[0]
++		&& h->pe_sig[1] == loongarch_image_pe_sig[1]);
++}
++
++static inline uint64_t loongarch_header_text_offset(
++	const struct loongarch_image_header *h)
++{
++	if (!h)
++		return 0;
++
++	return le64toh(h->text_offset);
++}
++
++static inline uint64_t loongarch_header_image_size(
++	const struct loongarch_image_header *h)
++{
++	if (!h)
++		return 0;
++
++	return le64toh(h->image_size);
++}
++
++static inline uint64_t loongarch_header_kernel_entry(
++	const struct loongarch_image_header *h)
++{
++	if (!h)
++		return 0;
++
++	return le64toh(h->kernel_entry);
++}
++
++#endif
+diff --git a/kexec/arch/loongarch/include/arch/options.h b/kexec/arch/loongarch/include/arch/options.h
+new file mode 100644
+index 0000000..25a7dc1
+--- /dev/null
++++ b/kexec/arch/loongarch/include/arch/options.h
+@@ -0,0 +1,28 @@
++#ifndef KEXEC_ARCH_LOONGARCH_OPTIONS_H
++#define KEXEC_ARCH_LOONGARCH_OPTIONS_H
++
++#define OPT_APPEND		((OPT_MAX)+0)
++#define OPT_INITRD		((OPT_MAX)+1)
++#define OPT_REUSE_CMDLINE	((OPT_MAX)+2)
++#define OPT_ARCH_MAX		((OPT_MAX)+3)
++
++#define KEXEC_ARCH_OPTIONS \
++	KEXEC_OPTIONS \
++	{ "append",        1, NULL, OPT_APPEND }, \
++	{ "command-line",  1, NULL, OPT_APPEND }, \
++	{ "initrd",        1, NULL, OPT_INITRD }, \
++	{ "ramdisk",       1, NULL, OPT_INITRD }, \
++	{ "reuse-cmdline", 0, NULL, OPT_REUSE_CMDLINE }, \
++
++#define KEXEC_ARCH_OPT_STR KEXEC_OPT_STR /* Only accept long arch options. */
++#define KEXEC_ALL_OPTIONS KEXEC_ARCH_OPTIONS
++#define KEXEC_ALL_OPT_STR KEXEC_ARCH_OPT_STR
++
++static const char loongarch_opts_usage[] __attribute__ ((unused)) =
++"     --append=STRING       Set the kernel command line to STRING.\n"
++"     --command-line=STRING Set the kernel command line to STRING.\n"
++"     --initrd=FILE         Use FILE as the kernel initial ramdisk.\n"
++"     --ramdisk=FILE        Use FILE as the kernel initial ramdisk.\n"
++"     --reuse-cmdline       Use kernel command line from running system.\n";
++
++#endif /* KEXEC_ARCH_LOONGARCH_OPTIONS_H */
+diff --git a/kexec/arch/loongarch/iomem.h b/kexec/arch/loongarch/iomem.h
+new file mode 100644
+index 0000000..7671e26
+--- /dev/null
++++ b/kexec/arch/loongarch/iomem.h
+@@ -0,0 +1,10 @@
++#ifndef IOMEM_H
++#define IOMEM_H
++
++#define SYSTEM_RAM		"System RAM\n"
++#define KERNEL_CODE		"Kernel code\n"
++#define KERNEL_DATA		"Kernel data\n"
++#define CRASH_KERNEL		"Crash kernel\n"
++#define IOMEM_RESERVED		"Reserved\n"
++
++#endif
+diff --git a/kexec/arch/loongarch/kexec-elf-loongarch.c b/kexec/arch/loongarch/kexec-elf-loongarch.c
+new file mode 100644
+index 0000000..0ac451e
+--- /dev/null
++++ b/kexec/arch/loongarch/kexec-elf-loongarch.c
+@@ -0,0 +1,129 @@
++/*
++ * kexec-elf-loongarch.c - kexec Elf loader for loongarch
++ *
++ * Copyright (C) 2022 Loongson Technology Corporation Limited.
++ *   Youling Tang <tangyouling@loongson.cn>
++ *
++ * This source code is licensed under the GNU General Public License,
++ * Version 2.  See the file COPYING for more details.
++*/
++
++#define _GNU_SOURCE
++
++#include <limits.h>
++#include <errno.h>
++#include <elf.h>
++
++#include "kexec.h"
++#include "kexec-elf.h"
++#include "kexec-syscall.h"
++#include "crashdump-loongarch.h"
++#include "kexec-loongarch.h"
++#include "arch/options.h"
++
++off_t initrd_base, initrd_size;
++
++int elf_loongarch_probe(const char *kernel_buf, off_t kernel_size)
++{
++	struct mem_ehdr ehdr;
++	int result;
++
++	result = build_elf_exec_info(kernel_buf, kernel_size, &ehdr, 0);
++	if (result < 0) {
++		dbgprintf("%s: Not an ELF executable.\n", __func__);
++		goto out;
++	}
++
++	/* Verify the architecuture specific bits. */
++	if (ehdr.e_machine != EM_LOONGARCH) {
++		dbgprintf("%s: Not an LoongArch ELF executable.\n", __func__);
++		result = -1;
++		goto out;
++	}
++
++	result = 0;
++out:
++	free_elf_info(&ehdr);
++	return result;
++}
++
++int elf_loongarch_load(int argc, char **argv, const char *kernel_buf,
++	off_t kernel_size, struct kexec_info *info)
++{
++	const struct loongarch_image_header *header = NULL;
++	unsigned long kernel_segment;
++	struct mem_ehdr ehdr;
++	int result;
++
++	result = build_elf_exec_info(kernel_buf, kernel_size, &ehdr, 0);
++
++	if (result < 0) {
++		dbgprintf("%s: build_elf_exec_info failed\n", __func__);
++		goto exit;
++	}
++
++	kernel_segment = loongarch_locate_kernel_segment(info);
++
++	if (kernel_segment == ULONG_MAX) {
++		dbgprintf("%s: Kernel segment is not allocated\n", __func__);
++		result = EFAILED;
++		goto exit;
++	}
++
++	dbgprintf("%s: kernel_segment: %016lx\n", __func__, kernel_segment);
++	dbgprintf("%s: image_size:     %016lx\n", __func__,
++		kernel_size);
++	dbgprintf("%s: text_offset:    %016lx\n", __func__,
++		loongarch_mem.text_offset);
++	dbgprintf("%s: phys_offset:    %016lx\n", __func__,
++		loongarch_mem.phys_offset);
++	dbgprintf("%s: PE format:      %s\n", __func__,
++		(loongarch_header_check_pe_sig(header) ? "yes" : "no"));
++
++	/* create and initialize elf core header segment */
++	if (info->kexec_flags & KEXEC_ON_CRASH) {
++		result = load_crashdump_segments(info);
++		if (result) {
++			dbgprintf("%s: Creating eflcorehdr failed.\n",
++								__func__);
++			goto exit;
++		}
++	}
++
++	/* load the kernel */
++	if (info->kexec_flags & KEXEC_ON_CRASH)
++		/*
++		 * offset addresses in elf header in order to load
++		 * vmlinux (elf_exec) into crash kernel's memory.
++		 */
++		fixup_elf_addrs(&ehdr);
++
++	info->entry = (void *)virt_to_phys(ehdr.e_entry);
++
++	result = elf_exec_load(&ehdr, info);
++
++	if (result) {
++		dbgprintf("%s: elf_exec_load failed\n", __func__);
++		goto exit;
++	}
++
++	/* for vmlinuz kernel image */
++	if (kernel_size < MiB(16))
++		kernel_size = MiB(64);
++
++	/* load additional data */
++	result = loongarch_load_other_segments(info, kernel_segment + kernel_size);
++
++exit:
++	free_elf_info(&ehdr);
++	if (result)
++		fprintf(stderr, "kexec: Bad elf image file, load failed.\n");
++	return result;
++}
++
++void elf_loongarch_usage(void)
++{
++	printf(
++"     An LoongArch ELF image, little endian.\n"
++"     Typically vmlinux or a stripped version of vmlinux.\n\n");
++}
+diff --git a/kexec/arch/loongarch/kexec-elf-rel-loongarch.c b/kexec/arch/loongarch/kexec-elf-rel-loongarch.c
+new file mode 100644
+index 0000000..59f7f5d
+--- /dev/null
++++ b/kexec/arch/loongarch/kexec-elf-rel-loongarch.c
+@@ -0,0 +1,42 @@
++/*
++ * kexec-elf-rel-loongarch.c - kexec Elf relocation routines
++ *
++ * Copyright (C) 2022 Loongson Technology Corporation Limited.
++ *
++ * This source code is licensed under the GNU General Public License,
++ * Version 2.  See the file COPYING for more details.
++*/
++
++#include <stdio.h>
++#include <elf.h>
++#include "../../kexec.h"
++#include "../../kexec-elf.h"
++
++int machine_verify_elf_rel(struct mem_ehdr *ehdr)
++{
++	if (ehdr->ei_data != ELFDATA2MSB)
++		return 0;
++
++	if (ehdr->ei_class != ELFCLASS32)
++		return 0;
++
++	if (ehdr->e_machine != EM_LOONGARCH)
++		return 0;
++
++	return 1;
++}
++
++void machine_apply_elf_rel(struct mem_ehdr *UNUSED(ehdr),
++			   struct mem_sym *UNUSED(sym),
++			   unsigned long r_type,
++			   void *UNUSED(location),
++			   unsigned long UNUSED(address),
++			   unsigned long UNUSED(value))
++{
++	switch (r_type) {
++
++	default:
++		die("Unknown rela relocation: %lu\n", r_type);
++		break;
++	}
++}
+diff --git a/kexec/arch/loongarch/kexec-loongarch.c b/kexec/arch/loongarch/kexec-loongarch.c
+new file mode 100644
+index 0000000..7e004eb
+--- /dev/null
++++ b/kexec/arch/loongarch/kexec-loongarch.c
+@@ -0,0 +1,397 @@
++/*
++ * kexec-loongarch.c - kexec for loongarch
++ *
++ * Copyright (C) 2022 Loongson Technology Corporation Limited.
++ *   Youling Tang <tangyouling@loongson.cn>
++ *
++ * This source code is licensed under the GNU General Public License,
++ * Version 2.  See the file COPYING for more details.
++ */
++
++#include <assert.h>
++#include <errno.h>
++#include <getopt.h>
++#include <inttypes.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <linux/elf-em.h>
++#include <elf.h>
++#include <elf_info.h>
++
++#include "kexec.h"
++#include "kexec-loongarch.h"
++#include "crashdump-loongarch.h"
++#include "iomem.h"
++#include "kexec-syscall.h"
++#include "mem_regions.h"
++#include "arch/options.h"
++
++#define CMDLINE_PREFIX "kexec "
++static char cmdline[COMMAND_LINE_SIZE] = CMDLINE_PREFIX;
++
++/* Converts unsigned long to ascii string. */
++static void ultoa(unsigned long i, char *str)
++{
++	int j = 0, k;
++	char tmp;
++
++	do {
++		str[j++] = i % 10 + '0';
++	} while ((i /= 10) > 0);
++	str[j] = '\0';
++
++	/* Reverse the string. */
++	for (j = 0, k = strlen(str) - 1; j < k; j++, k--) {
++		tmp = str[k];
++		str[k] = str[j];
++		str[j] = tmp;
++	}
++}
++
++/* Adds "initrd=start,size" parameters to command line. */
++static int cmdline_add_initrd(char *cmdline, unsigned long addr,
++		unsigned long size)
++{
++	int cmdlen, len;
++	char str[50], *ptr;
++
++	ptr = str;
++	strcpy(str, " initrd=");
++	ptr += strlen(str);
++	ultoa(addr, ptr);
++	strcat(str, ",");
++	ptr = str + strlen(str);
++	ultoa(size, ptr);
++	len = strlen(str);
++	cmdlen = strlen(cmdline) + len;
++	if (cmdlen > (COMMAND_LINE_SIZE - 1))
++		die("Command line overflow\n");
++	strcat(cmdline, str);
++
++	return 0;
++}
++
++/* Adds the appropriate "mem=size@start" options to command line, indicating the
++ * memory region the new kernel can use to boot into. */
++static int cmdline_add_mem(char *cmdline, unsigned long addr,
++		unsigned long size)
++{
++	int cmdlen, len;
++	char str[50], *ptr;
++
++	addr = addr/1024;
++	size = size/1024;
++	ptr = str;
++	strcpy(str, " mem=");
++	ptr += strlen(str);
++	ultoa(size, ptr);
++	strcat(str, "K@");
++	ptr = str + strlen(str);
++	ultoa(addr, ptr);
++	strcat(str, "K");
++	len = strlen(str);
++	cmdlen = strlen(cmdline) + len;
++	if (cmdlen > (COMMAND_LINE_SIZE - 1))
++		die("Command line overflow\n");
++	strcat(cmdline, str);
++
++	return 0;
++}
++
++/* Adds the "elfcorehdr=size@start" command line parameter to command line. */
++static int cmdline_add_elfcorehdr(char *cmdline, unsigned long addr,
++			unsigned long size)
++{
++	int cmdlen, len;
++	char str[50], *ptr;
++
++	addr = addr/1024;
++	size = size/1024;
++	ptr = str;
++	strcpy(str, " elfcorehdr=");
++	ptr += strlen(str);
++	ultoa(size, ptr);
++	strcat(str, "K@");
++	ptr = str + strlen(str);
++	ultoa(addr, ptr);
++	strcat(str, "K");
++	len = strlen(str);
++	cmdlen = strlen(cmdline) + len;
++	if (cmdlen > (COMMAND_LINE_SIZE - 1))
++		die("Command line overflow\n");
++	strcat(cmdline, str);
++
++	return 0;
++}
++
++/* Return a sorted list of memory ranges. */
++static struct memory_range memory_range[MAX_MEMORY_RANGES];
++
++int get_memory_ranges(struct memory_range **range, int *ranges,
++		      unsigned long UNUSED(kexec_flags))
++{
++	int memory_ranges = 0;
++
++	const char *iomem = proc_iomem();
++	char line[MAX_LINE];
++	FILE *fp;
++	unsigned long long start, end;
++	char *str;
++	int type, consumed, count;
++
++	fp = fopen(iomem, "r");
++	if (!fp) {
++		fprintf(stderr, "Cannot open %s: %s\n", iomem, strerror(errno));
++		return -1;
++	}
++
++	while (fgets(line, sizeof(line), fp) != 0) {
++		if (memory_ranges >= MAX_MEMORY_RANGES)
++			break;
++		count = sscanf(line, "%llx-%llx : %n", &start, &end, &consumed);
++		if (count != 2)
++			continue;
++		str = line + consumed;
++		end = end + 1;
++		if (!strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)))
++			type = RANGE_RAM;
++		else if (!strncmp(str, IOMEM_RESERVED, strlen(IOMEM_RESERVED)))
++			type = RANGE_RESERVED;
++		else
++			continue;
++
++		if (memory_ranges > 0 &&
++		    memory_range[memory_ranges - 1].end == start &&
++		    memory_range[memory_ranges - 1].type == type) {
++			memory_range[memory_ranges - 1].end = end;
++		} else {
++			memory_range[memory_ranges].start = start;
++			memory_range[memory_ranges].end = end;
++			memory_range[memory_ranges].type = type;
++			memory_ranges++;
++		}
++	}
++	fclose(fp);
++	*range = memory_range;
++	*ranges = memory_ranges;
++
++	dbgprint_mem_range("MEMORY RANGES:", *range, *ranges);
++	return 0;
++}
++
++struct file_type file_type[] = {
++	{"elf-loongarch", elf_loongarch_probe, elf_loongarch_load, elf_loongarch_usage},
++	{"pei-loongarch", pei_loongarch_probe, pei_loongarch_load, pei_loongarch_usage},
++};
++int file_types = sizeof(file_type) / sizeof(file_type[0]);
++
++/* loongarch global varables. */
++
++struct loongarch_mem loongarch_mem;
++
++/**
++ * loongarch_process_image_header - Process the loongarch image header.
++ */
++
++int loongarch_process_image_header(const struct loongarch_image_header *h)
++{
++
++	if (!loongarch_header_check_pe_sig(h))
++		return EFAILED;
++
++	if (h->image_size) {
++		loongarch_mem.text_offset = loongarch_header_text_offset(h);
++		loongarch_mem.image_size = loongarch_header_image_size(h);
++	}
++
++	return 0;
++}
++
++void arch_usage(void)
++{
++	printf(loongarch_opts_usage);
++}
++
++struct arch_options_t arch_options = {
++	.core_header_type = CORE_TYPE_ELF64,
++};
++
++int arch_process_options(int argc, char **argv)
++{
++	static const char short_options[] = KEXEC_ARCH_OPT_STR "";
++	static const struct option options[] = {
++		KEXEC_ARCH_OPTIONS
++		{ 0 },
++	};
++	int opt;
++	char *cmdline = NULL;
++	const char *append = NULL;
++
++	while ((opt = getopt_long(argc, argv, short_options,
++				  options, 0)) != -1) {
++		switch (opt) {
++		case OPT_APPEND:
++			append = optarg;
++			break;
++		case OPT_REUSE_CMDLINE:
++			cmdline = get_command_line();
++			remove_parameter(cmdline, "kexec");
++			remove_parameter(cmdline, "initrd");
++			remove_parameter(cmdline, "rd_start");
++			remove_parameter(cmdline, "rd_size");
++			remove_parameter(cmdline, "vfio_iommu_type1.allow_unsafe_interrupts");
++			break;
++		case OPT_INITRD:
++			arch_options.initrd_file = optarg;
++			break;
++		default:
++			break;
++		}
++	}
++
++	arch_options.command_line = concat_cmdline(cmdline, append);
++
++	dbgprintf("%s:%d: command_line: %s\n", __func__, __LINE__,
++		arch_options.command_line);
++	dbgprintf("%s:%d: initrd: %s\n", __func__, __LINE__,
++		arch_options.initrd_file);
++
++	return 0;
++}
++
++const struct arch_map_entry arches[] = {
++	{ "loongarch64", KEXEC_ARCH_LOONGARCH },
++	{ NULL, 0 },
++};
++
++unsigned long loongarch_locate_kernel_segment(struct kexec_info *info)
++{
++	unsigned long hole;
++
++	if (info->kexec_flags & KEXEC_ON_CRASH) {
++		unsigned long hole_end;
++
++		hole = (crash_reserved_mem[usablemem_rgns.size - 1].start < mem_min ?
++				mem_min : crash_reserved_mem[usablemem_rgns.size - 1].start) +
++				loongarch_mem.text_offset;
++		hole = _ALIGN_UP(hole, MiB(1));
++		hole_end = hole + loongarch_mem.text_offset + loongarch_mem.image_size;
++
++		if ((hole_end > mem_max) ||
++		    (hole_end > crash_reserved_mem[usablemem_rgns.size - 1].end)) {
++			dbgprintf("%s: Crash kernel out of range\n", __func__);
++			hole = ULONG_MAX;
++		}
++	} else {
++		hole = locate_hole(info,
++			loongarch_mem.text_offset + loongarch_mem.image_size,
++			MiB(1), 0, ULONG_MAX, 1);
++
++		if (hole == ULONG_MAX)
++			dbgprintf("%s: locate_hole failed\n", __func__);
++	}
++
++	return hole;
++}
++
++/*
++ * loongarch_load_other_segments - Prepare the initrd and cmdline segments.
++ */
++
++int loongarch_load_other_segments(struct kexec_info *info, unsigned long hole_min)
++{
++	unsigned long initrd_min, hole_max;
++	char *initrd_buf = NULL;
++	unsigned long pagesize = getpagesize();
++
++	if (arch_options.command_line) {
++		if (strlen(arch_options.command_line) >
++		    sizeof(cmdline) - 1) {
++			fprintf(stderr,
++				"Kernel command line too long for kernel!\n");
++			return EFAILED;
++		}
++
++		strncat(cmdline, arch_options.command_line, sizeof(cmdline) - 1);
++	}
++
++	/* Put the other segments after the image. */
++
++	initrd_min = hole_min;
++	if (info->kexec_flags & KEXEC_ON_CRASH)
++		hole_max = crash_reserved_mem[usablemem_rgns.size - 1].end;
++	else
++		hole_max = ULONG_MAX;
++
++	if (arch_options.initrd_file) {
++
++		initrd_buf = slurp_decompress_file(arch_options.initrd_file, &initrd_size);
++
++		initrd_base = add_buffer(info, initrd_buf, initrd_size,
++					initrd_size, sizeof(void *),
++					_ALIGN_UP(initrd_min,
++						pagesize), hole_max, 1);
++		dbgprintf("initrd_base: %lx, initrd_size: %lx\n", initrd_base, initrd_size);
++
++		cmdline_add_initrd(cmdline, initrd_base, initrd_size);
++	}
++
++	if (info->kexec_flags & KEXEC_ON_CRASH) {
++		cmdline_add_elfcorehdr(cmdline, elfcorehdr_mem.start,
++				elfcorehdr_mem.end - elfcorehdr_mem.start + 1);
++
++		cmdline_add_mem(cmdline, crash_reserved_mem[usablemem_rgns.size - 1].start,
++			crash_reserved_mem[usablemem_rgns.size - 1].end -
++			crash_reserved_mem[usablemem_rgns.size - 1].start + 1);
++	}
++
++	cmdline[sizeof(cmdline) - 1] = 0;
++	add_buffer(info, cmdline, sizeof(cmdline), sizeof(cmdline),
++		sizeof(void *), _ALIGN_UP(hole_min, getpagesize()),
++		0xffffffff, 1);
++
++	dbgprintf("%s:%d: command_line: %s\n", __func__, __LINE__, cmdline);
++
++	return 0;
++
++}
++
++int arch_compat_trampoline(struct kexec_info *UNUSED(info))
++{
++	return 0;
++}
++
++void arch_update_purgatory(struct kexec_info *UNUSED(info))
++{
++}
++
++unsigned long virt_to_phys(unsigned long addr)
++{
++	return addr & ((1ULL << 48) - 1);
++}
++
++/*
++ * add_segment() should convert base to a physical address on loongarch,
++ * while the default is just to work with base as is
++ */
++void add_segment(struct kexec_info *info, const void *buf, size_t bufsz,
++		 unsigned long base, size_t memsz)
++{
++	add_segment_phys_virt(info, buf, bufsz, virt_to_phys(base), memsz, 1);
++}
++
++/*
++ * add_buffer() should convert base to a physical address on loongarch,
++ * while the default is just to work with base as is
++ */
++unsigned long add_buffer(struct kexec_info *info, const void *buf,
++			 unsigned long bufsz, unsigned long memsz,
++			 unsigned long buf_align, unsigned long buf_min,
++			 unsigned long buf_max, int buf_end)
++{
++	return add_buffer_phys_virt(info, buf, bufsz, memsz, buf_align,
++				    buf_min, buf_max, buf_end, 1);
++}
+diff --git a/kexec/arch/loongarch/kexec-loongarch.h b/kexec/arch/loongarch/kexec-loongarch.h
+new file mode 100644
+index 0000000..5120a26
+--- /dev/null
++++ b/kexec/arch/loongarch/kexec-loongarch.h
+@@ -0,0 +1,60 @@
++#ifndef KEXEC_LOONGARCH_H
++#define KEXEC_LOONGARCH_H
++
++#include <sys/types.h>
++
++#include "image-header.h"
++
++#define BOOT_BLOCK_VERSION 17
++#define BOOT_BLOCK_LAST_COMP_VERSION 16
++
++#define MAX_MEMORY_RANGES 64
++#define MAX_LINE 160
++
++#define CORE_TYPE_ELF64 1
++
++#define COMMAND_LINE_SIZE 512
++
++#define KiB(x) ((x) * 1024UL)
++#define MiB(x) (KiB(x) * 1024UL)
++
++int elf_loongarch_probe(const char *kernel_buf, off_t kernel_size);
++int elf_loongarch_load(int argc, char **argv, const char *buf, off_t len,
++	struct kexec_info *info);
++void elf_loongarch_usage(void);
++
++int pei_loongarch_probe(const char *buf, off_t len);
++int pei_loongarch_load(int argc, char **argv, const char *buf, off_t len,
++	struct kexec_info *info);
++void pei_loongarch_usage(void);
++
++int loongarch_process_image_header(const struct loongarch_image_header *h);
++
++unsigned long loongarch_locate_kernel_segment(struct kexec_info *info);
++int loongarch_load_other_segments(struct kexec_info *info,
++	unsigned long hole_min);
++
++struct arch_options_t {
++	char *command_line;
++	char *initrd_file;
++	char *dtb;
++	int core_header_type;
++};
++
++/**
++ * struct loongarch_mem - Memory layout info.
++ */
++
++struct loongarch_mem {
++	uint64_t phys_offset;
++	uint64_t text_offset;
++	uint64_t image_size;
++};
++
++extern struct loongarch_mem loongarch_mem;
++
++extern struct memory_ranges usablemem_rgns;
++extern struct arch_options_t arch_options;
++extern off_t initrd_base, initrd_size;
++
++#endif /* KEXEC_LOONGARCH_H */
+diff --git a/kexec/arch/loongarch/kexec-pei-loongarch.c b/kexec/arch/loongarch/kexec-pei-loongarch.c
+new file mode 100644
+index 0000000..1a11103
+--- /dev/null
++++ b/kexec/arch/loongarch/kexec-pei-loongarch.c
+@@ -0,0 +1,124 @@
++/*
++ * LoongArch kexec PE format binary image support.
++ *
++ * Copyright (C) 2022 Loongson Technology Corporation Limited.
++ *   Youling Tang <tangyouling@loongson.cn>
++ *
++ * derived from kexec-image-arm64.c
++ *
++ * This source code is licensed under the GNU General Public License,
++ * Version 2.  See the file COPYING for more details.
++ */
++
++#define _GNU_SOURCE
++
++#include <limits.h>
++#include <errno.h>
++#include <elf.h>
++
++#include "kexec.h"
++#include "kexec-elf.h"
++#include "image-header.h"
++#include "kexec-syscall.h"
++#include "crashdump-loongarch.h"
++#include "kexec-loongarch.h"
++#include "arch/options.h"
++
++int pei_loongarch_probe(const char *kernel_buf, off_t kernel_size)
++{
++	const struct loongarch_image_header *h;
++
++	if (kernel_size < sizeof(struct loongarch_image_header)) {
++		dbgprintf("%s: No loongarch image header.\n", __func__);
++		return -1;
++	}
++
++	h = (const struct loongarch_image_header *)(kernel_buf);
++
++	if (!loongarch_header_check_pe_sig(h)) {
++		dbgprintf("%s: Bad loongarch PE image header.\n", __func__);
++		return -1;
++	}
++
++	return 0;
++}
++
++int pei_loongarch_load(int argc, char **argv, const char *buf,
++	off_t len, struct kexec_info *info)
++{
++	int result;
++	unsigned long hole_min = 0;
++	unsigned long kernel_segment, kernel_entry;
++	const struct loongarch_image_header *header;
++
++	header = (const struct loongarch_image_header *)(buf);
++
++	if (loongarch_process_image_header(header))
++		return EFAILED;
++
++	kernel_segment = loongarch_locate_kernel_segment(info);
++
++	if (kernel_segment == ULONG_MAX) {
++		dbgprintf("%s: Kernel segment is not allocated\n", __func__);
++		result = EFAILED;
++		goto exit;
++	}
++
++	kernel_entry = virt_to_phys(loongarch_header_kernel_entry(header));
++
++	if (info->kexec_flags & KEXEC_ON_CRASH)
++		/*
++		 * offset addresses in order to load vmlinux.efi into
++		 * crash kernel's memory.
++		 */
++		kernel_entry += crash_reserved_mem[usablemem_rgns.size - 1].start;
++
++	dbgprintf("%s: kernel_segment: %016lx\n", __func__, kernel_segment);
++	dbgprintf("%s: kernel_entry:   %016lx\n", __func__, kernel_entry);
++	dbgprintf("%s: image_size:     %016lx\n", __func__,
++		loongarch_mem.image_size);
++	dbgprintf("%s: text_offset:    %016lx\n", __func__,
++		loongarch_mem.text_offset);
++	dbgprintf("%s: phys_offset:    %016lx\n", __func__,
++		loongarch_mem.phys_offset);
++	dbgprintf("%s: PE format:      %s\n", __func__,
++		(loongarch_header_check_pe_sig(header) ? "yes" : "no"));
++
++	/* Get kernel entry point */
++	info->entry = (void *)kernel_entry;
++
++	hole_min = kernel_segment + loongarch_mem.image_size;
++
++	/* Create and initialize elf core header segment */
++	if (info->kexec_flags & KEXEC_ON_CRASH) {
++		result = load_crashdump_segments(info);
++		if (result) {
++			dbgprintf("%s: Creating eflcorehdr failed.\n",
++								__func__);
++			goto exit;
++		}
++	}
++
++	/* Load the kernel */
++	add_segment(info, buf, len, kernel_segment, loongarch_mem.image_size);
++
++	/* Prepare and load dtb and initrd data */
++	result = loongarch_load_other_segments(info, hole_min);
++	if (result) {
++		fprintf(stderr, "kexec: Load dtb and initrd segments failed.\n");
++		goto exit;
++	}
++
++exit:
++	if (result)
++		fprintf(stderr, "kexec: load failed.\n");
++
++	return result;
++}
++
++void pei_loongarch_usage(void)
++{
++	printf(
++"     An LoongArch PE format binary image, uncompressed, little endian.\n"
++"     Typically a vmlinux.efi file.\n\n");
++}
+diff --git a/kexec/kexec-syscall.h b/kexec/kexec-syscall.h
+index dc71dc9..45992f4 100644
+--- a/kexec/kexec-syscall.h
++++ b/kexec/kexec-syscall.h
+@@ -39,6 +39,9 @@
+ #ifdef __s390__
+ #define __NR_kexec_load		277
+ #endif
++#ifdef __loongarch__
++#define __NR_kexec_load		104
++#endif
+ #if defined(__arm__) || defined(__arm64__)
+ #define __NR_kexec_load		__NR_SYSCALL_BASE + 347
+ #endif
+@@ -59,7 +62,7 @@
+ #endif
+ #endif /*ifndef __NR_kexec_load*/
+ 
+-#ifdef __arm__
++#if defined(__arm__) || defined(__loongarch__)
+ #undef __NR_kexec_file_load
+ #endif
+ 
+@@ -139,6 +142,7 @@ static inline long kexec_file_load(int kernel_fd, int initrd_fd,
+ #define KEXEC_ARCH_MIPS_LE (10 << 16)
+ #define KEXEC_ARCH_MIPS    ( 8 << 16)
+ #define KEXEC_ARCH_CRIS    (76 << 16)
++#define KEXEC_ARCH_LOONGARCH	(258 << 16)
+ 
+ #define KEXEC_MAX_SEGMENTS 16
+ 
+@@ -182,5 +186,8 @@ static inline long kexec_file_load(int kernel_fd, int initrd_fd,
+ #if defined(__arm64__)
+ #define KEXEC_ARCH_NATIVE	KEXEC_ARCH_ARM64
+ #endif
++#if defined(__loongarch__)
++#define KEXEC_ARCH_NATIVE	KEXEC_ARCH_LOONGARCH
++#endif
+ 
+ #endif /* KEXEC_SYSCALL_H */
+diff --git a/kexec/kexec.c b/kexec/kexec.c
+index 5b8beca..cf90e5d 100644
+--- a/kexec/kexec.c
++++ b/kexec/kexec.c
+@@ -1081,7 +1081,7 @@ static int k_status(unsigned long kexec_flags)
+ /*
+  * Remove parameter from a kernel command line. Helper function by get_command_line().
+  */
+-static void remove_parameter(char *line, const char *param_name)
++void remove_parameter(char *line, const char *param_name)
+ {
+ 	char *start, *end;
+ 
+diff --git a/kexec/kexec.h b/kexec/kexec.h
+index 9cbc77f..5500627 100644
+--- a/kexec/kexec.h
++++ b/kexec/kexec.h
+@@ -306,6 +306,7 @@ int arch_compat_trampoline(struct kexec_info *info);
+ void arch_update_purgatory(struct kexec_info *info);
+ int is_crashkernel_mem_reserved(void);
+ int get_crash_kernel_load_range(uint64_t *start, uint64_t *end);
++void remove_parameter(char *line, const char *param_name);
+ char *get_command_line(void);
+ 
+ int kexec_iomem_for_each_line(char *match,
+diff --git a/purgatory/Makefile b/purgatory/Makefile
+index 1955748..1850999 100644
+--- a/purgatory/Makefile
++++ b/purgatory/Makefile
+@@ -28,6 +28,7 @@ include $(srcdir)/purgatory/arch/ppc64/Makefile
+ include $(srcdir)/purgatory/arch/s390/Makefile
+ include $(srcdir)/purgatory/arch/sh/Makefile
+ include $(srcdir)/purgatory/arch/x86_64/Makefile
++include $(srcdir)/purgatory/arch/loongarch/Makefile
+ include $(srcdir)/purgatory/arch/sw_64/Makefile
+ 
+ PURGATORY_SRCS+=$($(ARCH)_PURGATORY_SRCS)
+diff --git a/purgatory/arch/loongarch/Makefile b/purgatory/arch/loongarch/Makefile
+new file mode 100644
+index 0000000..b0c47b2
+--- /dev/null
++++ b/purgatory/arch/loongarch/Makefile
+@@ -0,0 +1,10 @@
++#
++# Purgatory loongarch
++#
++
++loongarch_PURGATORY_SRCS+= purgatory/arch/loongarch/purgatory-loongarch.c
++loongarch_PURGATORY_SRCS+= purgatory/arch/loongarch/console-loongarch.c
++
++dist += purgatory/arch/loongarch/Makefile $(loongarch_PURGATORY_SRCS)		\
++	purgatory/arch/loongarch/purgatory-loongarch.h
++
+diff --git a/purgatory/arch/loongarch/console-loongarch.c b/purgatory/arch/loongarch/console-loongarch.c
+new file mode 100644
+index 0000000..af34ecf
+--- /dev/null
++++ b/purgatory/arch/loongarch/console-loongarch.c
+@@ -0,0 +1,7 @@
++#include <purgatory.h>
++#include "unused.h"
++
++void putchar(int UNUSED(ch))
++{
++	/* Nothing for now */
++}
+diff --git a/purgatory/arch/loongarch/purgatory-loongarch.c b/purgatory/arch/loongarch/purgatory-loongarch.c
+new file mode 100644
+index 0000000..abe9297
+--- /dev/null
++++ b/purgatory/arch/loongarch/purgatory-loongarch.c
+@@ -0,0 +1,7 @@
++#include <purgatory.h>
++#include "purgatory-loongarch.h"
++
++void setup_arch(void)
++{
++	/* Nothing for now */
++}
+diff --git a/purgatory/arch/loongarch/purgatory-loongarch.h b/purgatory/arch/loongarch/purgatory-loongarch.h
+new file mode 100644
+index 0000000..cd1ab97
+--- /dev/null
++++ b/purgatory/arch/loongarch/purgatory-loongarch.h
+@@ -0,0 +1,6 @@
++#ifndef PURGATORY_LOONGARCH_H
++#define PURGATORY_LOONGARCH_H
++
++/* nothing yet */
++
++#endif /* PURGATORY_LOONGARCH_H */
+-- 
+2.33.0
+

@@ -17,11 +17,11 @@ KDUMP_COMMANDLINE=""
 # This variable lets us remove arguments from the current kdump commandline
 # as taken from either KDUMP_COMMANDLINE above, or from /proc/cmdline
 # NOTE: some arguments such as crashkernel will always be removed
-KDUMP_COMMANDLINE_REMOVE="hugepages hugepagesz slub_debug quiet log_buf_len rd_start rd_size initrd resume=UUID"
+KDUMP_COMMANDLINE_REMOVE="hugepages hugepagesz slub_debug quiet log_buf_len rd_start rd_size initrd"
 
 # This variable lets us append arguments to the current kdump commandline
 # after processed by KDUMP_COMMANDLINE_REMOVE
-KDUMP_COMMANDLINE_APPEND="nr_cpus=1 init 3 irqpoll reset_devices cgroup_disable=memory udev.children-max=2 panic=10 novmcoredd"
+KDUMP_COMMANDLINE_APPEND="init 3 irqpoll reset_devices cgroup_disable=memory udev.children-max=2 panic=10 novmcoredd"
 
 # Any additional kexec arguments required.  In most situations, this should
 # be left empty
@@ -34,32 +34,4 @@ KEXEC_ARGS=""
 #KDUMP_BOOTDIR="/boot"
 
 #What is the image type used for kdump
-KDUMP_IMG="vmlinux"
-
-#Please replace with the capture kernel to be reboot and the
-#the corresponding initrd only for LoongArch architecture
-# Example:
-#   DEFAULT_KDUMP_KERNEL="/boot/vmlinux-4.19.190-4.lns8.loongarch64+kdump"
-#   DEFAULT_TARGET_INITRD="/boot/initramfs-4.19.190-4.lns8.loongarch64+kdump.img"
-# If a DEFAULT_KDUMP_KERNEL is not specified, the default is set to
-# "/boot/vmlinux-$(uname -r)+kdump"
-DEFAULT_KDUMP_KERNEL=""
-# If a DEFAULT_TARGET_INITRD is not specified, the default is set to
-# "/boot/initramfs-$(uname -r)+kdump.img"
-DEFAULT_TARGET_INITRD=""
-
-# Logging is controlled by following variables in the first kernel:
-#   - @var KDUMP_STDLOGLVL - logging level to standard error (console output)
-#   - @var KDUMP_SYSLOGLVL - logging level to syslog (by logger command)
-#   - @var KDUMP_KMSGLOGLVL - logging level to /dev/kmsg (only for boot-time)
-#
-# In the second kernel, kdump will use the rd.kdumploglvl option to set the
-# log level in the above KDUMP_COMMANDLINE_APPEND.
-#   - @var rd.kdumploglvl - logging level to syslog (by logger command)
-#   - for example: add the rd.kdumploglvl=3 option to KDUMP_COMMANDLINE_APPEND
-#
-# Logging levels: no logging(0), error(1),warn(2),info(3),debug(4)
-#
-# KDUMP_STDLOGLVL=3
-# KDUMP_SYSLOGLVL=0
-# KDUMP_KMSGLOGLVL=0
+KDUMP_IMG="vmlinuz"
