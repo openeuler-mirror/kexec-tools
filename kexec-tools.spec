@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.26
-Release: 1
+Release: 2
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -77,6 +77,7 @@ Patch0003:	kexec-Quick-kexec-implementation-for-arm64.patch
 Patch0004:	sw_64.patch
 Patch0005:	makedumpfile-1.7.2-sw.patch
 %endif
+Patch0006:  kexec-tools-2.0.24-riscv.patch
 
 %description
 kexec-tools provides /sbin/kexec binary that facilitates a new
@@ -284,6 +285,9 @@ done
 %endif
 
 %changelog
+* Thu May 18 2023 yoo <sunyuechi@iscas.ac.cn> - 2.0.26-2
+- add riscv support
+
 * Mon Jan 30 2023 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.26-1
 - update to kexec-tools-2.0.26.1
 
