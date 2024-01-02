@@ -4,7 +4,7 @@
 
 Name: kexec-tools
 Version: 2.0.26
-Release: 1
+Release: 2
 License: GPLv2
 Summary: The kexec/kdump userspace component
 URL:     https://www.kernel.org/
@@ -110,7 +110,7 @@ rm -f kexec-tools.spec.in
 cp %{SOURCE21} %{SOURCE26} %{SOURCE27} .
 
 make
-%ifarch %{ix86} x86_64 aarch64  sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64  sw_64 loongarch64 ppc64le
 make -C eppic-%{eppic_ver}/libeppic
 make -C makedumpfile-%{mkdf_ver} LINKTYPE=dynamic USELZO=on USESNAPPY=on
 make -C makedumpfile-%{mkdf_ver} LDFLAGS="$LDFLAGS -I../eppic-%{eppic_ver}/libeppic -L../eppic-%{eppic_ver}/libeppic" eppic_makedumpfile.so
@@ -154,7 +154,7 @@ install -m 644 %{SOURCE16} %{buildroot}%{_unitdir}/kdump.service
 install -m 755 -D %{SOURCE22} %{buildroot}%{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
 install -m 644 %{SOURCE13} $RPM_BUILD_ROOT%{_udevrulesdir}/98-kexec.rules
 
-%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64 ppc64le
 install -m 755 makedumpfile-%{mkdf_ver}/makedumpfile $RPM_BUILD_ROOT/usr/sbin/makedumpfile
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.8 $RPM_BUILD_ROOT/%{_mandir}/man8/makedumpfile.8
 install -m 644 makedumpfile-%{mkdf_ver}/makedumpfile.conf.5 $RPM_BUILD_ROOT/%{_mandir}/man5/makedumpfile.conf.5
@@ -259,14 +259,14 @@ done
 %{dracutlibdir}/modules.d/*
 %{_unitdir}/kdump.service
 %{_prefix}/lib/systemd/system-generators/kdump-dep-generator.sh
-%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64 ppc64le
 %{_libdir}/eppic_makedumpfile.so
 /usr/share/makedumpfile/
 %endif
-%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64 ppc64le
 %{_sysconfdir}/makedumpfile.conf.sample
 %endif
-%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64 ppc64le
 /usr/sbin/makedumpfile
 %endif
 
@@ -279,11 +279,14 @@ done
 %{_mandir}/man8/mkdumprd.8.gz
 %{_mandir}/man8/vmcore-dmesg.8.gz
 %{_mandir}/man5/*
-%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64
+%ifarch %{ix86} x86_64 aarch64 sw_64 loongarch64 ppc64le
 %{_mandir}/man8/makedumpfile.8.gz
 %endif
 
 %changelog
+* Tue Jan 2 2024 peng.zou <peng.zou@shingroup.cn> - 2.0.26-2
+- Add ppc64le support
+
 * Mon Jan 30 2023 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.26-1
 - update to kexec-tools-2.0.26.1
 
