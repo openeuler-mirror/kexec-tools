@@ -1,6 +1,6 @@
 %global eppic_ver e8844d3793471163ae4a56d8f95897be9e5bd554
 %global eppic_shortver %(c=%{eppic_ver}; echo ${c:0:7})
-%global mkdf_ver 1.7.2
+%global mkdf_ver 1.7.3
 
 Name: kexec-tools
 Version: 2.0.26
@@ -284,6 +284,9 @@ done
 %endif
 
 %changelog
+* Mon Jan 30 2023 chenhaixiang <chenhaixiang3@huawei.com> - 2.0.26-3
+- update makedumpfile to makedumpfile-1.7.3
+
 * Tue Jan 2 2024 peng.zou <peng.zou@shingroup.cn> - 2.0.26-2
 - Add ppc64le support
 
