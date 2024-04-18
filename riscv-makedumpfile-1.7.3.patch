@@ -1,0 +1,910 @@
+From a88a07451eee09aac9b0c3f6ce54f959b2d08432 Mon Sep 17 00:00:00 2001
+From: Mingzheng Xing <xingmingzheng@iscas.ac.cn>
+Date: Wed, 17 Apr 2024 17:13:33 +0800
+Subject: [PATCH] riscv: makedumpfile 1.7.3
+
+Upgrade to upstream version 1.7.4, which provides support for the riscv
+architecture.
+
+This patch will be maintained until the openEuler community upgrade.
+
+Signed-off-by: Mingzheng Xing <xingmingzheng@iscas.ac.cn>
+---
+ makedumpfile-1.7.3/Makefile          |   6 +-
+ makedumpfile-1.7.3/README            |   3 +
+ makedumpfile-1.7.3/arch/ppc64.c      | 111 ++++++++++----
+ makedumpfile-1.7.3/arch/riscv64.c    | 219 +++++++++++++++++++++++++++
+ makedumpfile-1.7.3/dwarf_info.c      |  29 +++-
+ makedumpfile-1.7.3/makedumpfile.c    |  74 ++++++++-
+ makedumpfile-1.7.3/makedumpfile.h    | 122 ++++++++++++++-
+ makedumpfile-1.7.3/makedumpfile.spec |   2 +-
+ 8 files changed, 519 insertions(+), 47 deletions(-)
+ create mode 100644 makedumpfile-1.7.3/arch/riscv64.c
+
+diff --git a/makedumpfile-1.7.3/Makefile b/makedumpfile-1.7.3/Makefile
+index 9436f2a..0934f14 100644
+--- a/makedumpfile-1.7.3/Makefile
++++ b/makedumpfile-1.7.3/Makefile
+@@ -1,7 +1,7 @@
+ # makedumpfile
+ 
+-VERSION=1.7.3
+-DATE=25 Apr 2023
++VERSION=1.7.4
++DATE=6 Nov 2023
+ 
+ # Honour the environment variable CC
+ ifeq ($(strip $CC),)
+@@ -47,7 +47,7 @@ endif
+ SRC_BASE = makedumpfile.c makedumpfile.h diskdump_mod.h sadump_mod.h sadump_info.h
+ SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c sadump_info.c cache.c tools.c printk.c detect_cycle.c
+ OBJ_PART=$(patsubst %.c,%.o,$(SRC_PART))
+-SRC_ARCH = arch/arm.c arch/arm64.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c arch/sparc64.c arch/mips64.c arch/loongarch64.c
++SRC_ARCH = arch/arm.c arch/arm64.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c arch/sparc64.c arch/mips64.c arch/loongarch64.c arch/riscv64.c
+ OBJ_ARCH=$(patsubst %.c,%.o,$(SRC_ARCH))
+ 
+ LIBS = -ldw -lbz2 -ldl -lelf -lz
+diff --git a/makedumpfile-1.7.3/README b/makedumpfile-1.7.3/README
+index 4a9d0c0..858ae30 100644
+--- a/makedumpfile-1.7.3/README
++++ b/makedumpfile-1.7.3/README
+@@ -169,6 +169,9 @@
+   6.1    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
+   6.2    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
+   6.3    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
++  6.4    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
++  6.5    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
++  6.6    |    | ** |    |    |    | ** |    | -- |    | OK |    |    |
+ 
+   OK    : Support.
+   --    : Not support.
+diff --git a/makedumpfile-1.7.3/arch/ppc64.c b/makedumpfile-1.7.3/arch/ppc64.c
+index 5e70acb..96c357c 100644
+--- a/makedumpfile-1.7.3/arch/ppc64.c
++++ b/makedumpfile-1.7.3/arch/ppc64.c
+@@ -196,6 +196,10 @@ ppc64_vmemmap_init(void)
+ 	int psize, shift;
+ 	ulong head;
+ 
++	/* initialise vmemmap_list in case SYMBOL(vmemmap_list) is not found */
++	info->vmemmap_list = NULL;
++	info->vmemmap_cnt = 0;
++
+ 	if ((SYMBOL(vmemmap_list) == NOT_FOUND_SYMBOL)
+ 	    || (SYMBOL(mmu_psize_defs) == NOT_FOUND_SYMBOL)
+ 	    || (SYMBOL(mmu_vmemmap_psize) == NOT_FOUND_SYMBOL)
+@@ -216,15 +220,24 @@ ppc64_vmemmap_init(void)
+ 		return FALSE;
+ 	info->vmemmap_psize = 1 << shift;
+ 
+-	if (!readmem(VADDR, SYMBOL(vmemmap_list), &head, sizeof(unsigned long)))
+-		return FALSE;
+-
+ 	/*
+-	 * Get vmemmap list count and populate vmemmap regions info
+-	 */
+-	info->vmemmap_cnt = get_vmemmap_list_info(head);
+-	if (info->vmemmap_cnt == 0)
+-		return FALSE;
++	 * vmemmap_list symbol can be missing or set to 0 in the kernel.
++	 * This would imply vmemmap region is mapped in the kernel pagetable.
++	 *
++	 * So, read vmemmap_list anyway, and use 'vmemmap_list' if it's not empty
++	 * (head != NULL), or we will do a kernel pagetable walk for vmemmap address
++	 * translation later
++	 **/
++	readmem(VADDR, SYMBOL(vmemmap_list), &head, sizeof(unsigned long));
++
++	if (head) {
++		/*
++		 * Get vmemmap list count and populate vmemmap regions info
++		 */
++		info->vmemmap_cnt = get_vmemmap_list_info(head);
++		if (info->vmemmap_cnt == 0)
++			return FALSE;
++	}
+ 
+ 	info->flag_vmemmap = TRUE;
+ 	return TRUE;
+@@ -347,29 +360,6 @@ ppc64_vmalloc_init(void)
+ 	return TRUE;
+ }
+ 
+-/*
+- *  If the vmemmap address translation information is stored in the kernel,
+- *  make the translation.
+- */
+-static unsigned long long
+-ppc64_vmemmap_to_phys(unsigned long vaddr)
+-{
+-	int	i;
+-	ulong	offset;
+-	unsigned long long paddr = NOT_PADDR;
+-
+-	for (i = 0; i < info->vmemmap_cnt; i++) {
+-		if ((vaddr >= info->vmemmap_list[i].virt) && (vaddr <
+-		    (info->vmemmap_list[i].virt + info->vmemmap_psize))) {
+-			offset = vaddr - info->vmemmap_list[i].virt;
+-			paddr = info->vmemmap_list[i].phys + offset;
+-			break;
+-		}
+-	}
+-
+-	return paddr;
+-}
+-
+ static unsigned long long
+ ppc64_vtop_level4(unsigned long vaddr)
+ {
+@@ -379,6 +369,8 @@ ppc64_vtop_level4(unsigned long vaddr)
+ 	unsigned long long pgd_pte, pud_pte;
+ 	unsigned long long pmd_pte, pte;
+ 	unsigned long long paddr = NOT_PADDR;
++	uint is_hugepage = 0;
++	uint pdshift;
+ 	uint swap = 0;
+ 
+ 	if (info->page_buf == NULL) {
+@@ -413,6 +405,13 @@ ppc64_vtop_level4(unsigned long vaddr)
+ 	if (!pgd_pte)
+ 		return NOT_PADDR;
+ 
++	if (IS_HUGEPAGE(pgd_pte)) {
++		is_hugepage = 1;
++		pte = pgd_pte;
++		pdshift = info->l4_shift;
++		goto out;
++	}
++
+ 	/*
+ 	 * Sometimes we don't have level3 pagetable entries
+ 	 */
+@@ -426,6 +425,13 @@ ppc64_vtop_level4(unsigned long vaddr)
+ 		pud_pte = swap64(ULONG((info->page_buf + PAGEOFFSET(page_upper))), swap);
+ 		if (!pud_pte)
+ 			return NOT_PADDR;
++
++		if (IS_HUGEPAGE(pud_pte)) {
++			is_hugepage = 1;
++			pte = pud_pte;
++			pdshift = info->l3_shift;
++			goto out;
++		}
+ 	} else {
+ 		pud_pte = pgd_pte;
+ 	}
+@@ -440,6 +446,13 @@ ppc64_vtop_level4(unsigned long vaddr)
+ 	if (!(pmd_pte))
+ 		return NOT_PADDR;
+ 
++	if (IS_HUGEPAGE(pmd_pte)) {
++		is_hugepage = 1;
++		pte = pmd_pte;
++		pdshift = info->l2_shift;
++		goto out;
++	}
++
+ 	pmd_pte = pmd_page_vaddr_l4(pmd_pte);
+ 	page_table = (ulong *)(pmd_pte)
+ 			+ (BTOP(vaddr) & (info->ptrs_per_l1 - 1));
+@@ -456,8 +469,40 @@ ppc64_vtop_level4(unsigned long vaddr)
+ 	if (!pte)
+ 		return NOT_PADDR;
+ 
+-	paddr = PAGEBASE(PTOB((pte & info->pte_rpn_mask) >> info->pte_rpn_shift))
++out:
++	if (is_hugepage) {
++		paddr = PAGEBASE(PTOB((pte & info->pte_rpn_mask) >> info->pte_rpn_shift))
++			+ (vaddr & ((1UL << pdshift) - 1));
++	} else {
++		paddr = PAGEBASE(PTOB((pte & info->pte_rpn_mask) >> info->pte_rpn_shift))
+ 			+ PAGEOFFSET(vaddr);
++	}
++
++	return paddr;
++}
++
++/*
++ *  If the vmemmap address translation information is stored in the kernel,
++ *  make the translation.
++ */
++static unsigned long long
++ppc64_vmemmap_to_phys(unsigned long vaddr)
++{
++	int	i;
++	ulong	offset;
++	unsigned long long paddr = NOT_PADDR;
++
++	if (!info->vmemmap_list)
++		return ppc64_vtop_level4(vaddr);
++
++	for (i = 0; i < info->vmemmap_cnt; i++) {
++		if ((vaddr >= info->vmemmap_list[i].virt) && (vaddr <
++		    (info->vmemmap_list[i].virt + info->vmemmap_psize))) {
++			offset = vaddr - info->vmemmap_list[i].virt;
++			paddr = info->vmemmap_list[i].phys + offset;
++			break;
++		}
++	}
+ 
+ 	return paddr;
+ }
+@@ -567,8 +612,8 @@ get_machdep_info_ppc64(void)
+ 		return FALSE;
+ 	}
+ 
++	info->vmemmap_start = VMEMMAP_REGION_ID << REGION_SHIFT;
+ 	if (SYMBOL(vmemmap_list) != NOT_FOUND_SYMBOL) {
+-		info->vmemmap_start = VMEMMAP_REGION_ID << REGION_SHIFT;
+ 		info->vmemmap_end = info->vmemmap_start;
+ 		if (ppc64_vmemmap_init() == FALSE) {
+ 			ERRMSG("Can't get vmemmap list info.\n");
+diff --git a/makedumpfile-1.7.3/arch/riscv64.c b/makedumpfile-1.7.3/arch/riscv64.c
+new file mode 100644
+index 0000000..1b43ec4
+--- /dev/null
++++ b/makedumpfile-1.7.3/arch/riscv64.c
+@@ -0,0 +1,219 @@
++/*
++ * riscv64.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifdef __riscv64__
++
++#include "../print_info.h"
++#include "../elf_info.h"
++#include "../makedumpfile.h"
++
++int
++get_phys_base_riscv64(void)
++{
++	if (NUMBER(phys_ram_base) != NOT_FOUND_NUMBER)
++		info->phys_base = NUMBER(phys_ram_base);
++	else
++		/* In case that you are using qemu rv64 env */
++		info->phys_base = 0x80200000;
++
++	DEBUG_MSG("phys_base    : %lx\n", info->phys_base);
++	return TRUE;
++}
++
++int
++get_machdep_info_riscv64(void)
++{
++
++	if(NUMBER(va_bits) == NOT_FOUND_NUMBER ||  NUMBER(page_offset) == NOT_FOUND_NUMBER ||
++	   NUMBER(vmalloc_start) == NOT_FOUND_NUMBER || NUMBER(vmalloc_end) == NOT_FOUND_NUMBER ||
++	   NUMBER(vmemmap_start) == NOT_FOUND_NUMBER ||  NUMBER(vmemmap_end) == NOT_FOUND_NUMBER ||
++	   NUMBER(modules_vaddr) == NOT_FOUND_NUMBER ||  NUMBER(modules_end) == NOT_FOUND_NUMBER ||
++	   NUMBER(kernel_link_addr) == NOT_FOUND_NUMBER || NUMBER(va_kernel_pa_offset) == NOT_FOUND_NUMBER)
++		return FALSE;
++
++	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
++		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
++	else
++		info->max_physmem_bits = _MAX_PHYSMEM_BITS;
++
++	if (NUMBER(SECTION_SIZE_BITS) != NOT_FOUND_NUMBER)
++		info->section_size_bits = NUMBER(SECTION_SIZE_BITS);
++	else
++		info->section_size_bits = _SECTION_SIZE_BITS;
++
++	info->page_offset = NUMBER(page_offset);
++
++	DEBUG_MSG("va_bits    : %ld\n", NUMBER(va_bits));
++	DEBUG_MSG("page_offset   : %lx\n", NUMBER(page_offset));
++	DEBUG_MSG("vmalloc_start : %lx\n", NUMBER(vmalloc_start));
++	DEBUG_MSG("vmalloc_end   : %lx\n", NUMBER(vmalloc_end));
++	DEBUG_MSG("vmemmap_start : %lx\n", NUMBER(vmemmap_start));
++	DEBUG_MSG("vmemmap_end   : %lx\n", NUMBER(vmemmap_end));
++	DEBUG_MSG("modules_vaddr : %lx\n", NUMBER(modules_vaddr));
++	DEBUG_MSG("modules_end   : %lx\n", NUMBER(modules_end));
++	DEBUG_MSG("kernel_link_addr    : %lx\n", NUMBER(kernel_link_addr));
++	DEBUG_MSG("va_kernel_pa_offset : %lx\n", NUMBER(va_kernel_pa_offset));
++
++	return TRUE;
++}
++
++/*
++ * For direct memory mapping
++ */
++
++#define VTOP(X) ({ 									\
++	ulong _X = X;									\
++	(_X) >= NUMBER(kernel_link_addr) ? ((_X) - (NUMBER(va_kernel_pa_offset))):	\
++	((_X) - PAGE_OFFSET + (info->phys_base));					\
++	})
++
++static unsigned long long
++vtop_riscv64(pgd_t * pgd, unsigned long vaddr, long va_bits)
++{
++	unsigned long long paddr = NOT_PADDR;
++	pgd_t *pgda;
++	p4d_t *p4da;
++	pud_t *puda;
++	pmd_t *pmda;
++	pte_t *ptea;
++	ulong pt_val, pt_phys;
++
++#define pgd_index(X) ((va_bits == VA_BITS_SV57) ? pgd_index_l5(X) : 	\
++	((va_bits == VA_BITS_SV48) ? pgd_index_l4(X) : pgd_index_l3(X)))
++
++	/* PGD */
++	pgda = (pgd_t *)(pgd) + pgd_index(vaddr);
++	if (!readmem(PADDR, (unsigned long long)pgda, &pt_val, sizeof(pt_val))) {
++		ERRMSG("Can't read pgd\n");
++		goto invalid;
++	}
++
++	pt_val &= PTE_PFN_PROT_MASK;
++
++	if (!(pt_val & _PAGE_PRESENT)) {
++		ERRMSG("Can't get a valid pgd.\n");
++		goto invalid;
++	}
++
++	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
++
++	if (pt_val & _PAGE_LEAF)
++		goto out;
++
++	if (va_bits == VA_BITS_SV57)
++		goto p4d;
++	else if (va_bits == VA_BITS_SV48)
++		goto pud;
++	else
++		goto pmd;
++p4d:
++	/* P4D */
++	p4da = (p4d_t *)(pt_phys) + p4d_index(vaddr);
++	if (!readmem(PADDR, (unsigned long long)p4da, &pt_val, sizeof(pt_val))) {
++		ERRMSG("Can't read p4d\n");
++		goto invalid;
++	}
++
++	pt_val &= PTE_PFN_PROT_MASK;
++
++	if (!(pt_val & _PAGE_PRESENT)) {
++		ERRMSG("Can't get a valid p4d.\n");
++		goto invalid;
++	}
++
++	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
++
++	if (pt_val & _PAGE_LEAF)
++		goto out;
++pud:
++	/* PUD */
++	puda = (pud_t *)(pt_phys) + pud_index(vaddr);
++	if (!readmem(PADDR, (unsigned long long)puda, &pt_val, sizeof(pt_val))) {
++		ERRMSG("Can't read pud\n");
++		goto invalid;
++	}
++
++	pt_val &= PTE_PFN_PROT_MASK;
++
++	if (!(pt_val & _PAGE_PRESENT)) {
++		ERRMSG("Can't get a valid pud.\n");
++		goto invalid;
++	}
++
++	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
++
++	if(pt_val & _PAGE_LEAF)
++		goto out;
++pmd:
++	/* PMD */
++	pmda = (pmd_t *)(pt_phys) + pmd_index(vaddr);
++	if (!readmem(PADDR, (unsigned long long)pmda, &pt_val, sizeof(pt_val))) {
++		ERRMSG("Can't read pmd\n");
++		goto invalid;
++	}
++
++	pt_val &= PTE_PFN_PROT_MASK;
++
++	if (!(pt_val & _PAGE_PRESENT)) {
++		ERRMSG("Can't get a valid pmd.\n");
++		goto invalid;
++	}
++
++	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
++
++	if (pt_val & _PAGE_LEAF)
++		goto out;
++
++	/* PTE */
++	ptea = (pte_t *)(pt_phys) + pte_index(vaddr);
++	if (!readmem(PADDR, (unsigned long long)ptea, &pt_val, sizeof(pt_val))) {
++		ERRMSG("Can't read pte\n");
++		goto invalid;
++	}
++
++	pt_val &= PTE_PFN_PROT_MASK;
++
++	if (!(pt_val & _PAGE_PRESENT)) {
++		ERRMSG("Can't get a valid pte.\n");
++		goto invalid;
++	}
++
++	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
++
++out:
++	paddr = pt_phys + PAGEOFFSET(vaddr);
++invalid:
++	return paddr;
++}
++
++unsigned long long
++vaddr_to_paddr_riscv64(unsigned long vaddr)
++{
++	unsigned long long swapper_phys;
++
++	if (vaddr >= PAGE_OFFSET &&
++	    !(vaddr >= NUMBER(modules_vaddr) && vaddr <= NUMBER(modules_end))){
++		return VTOP(vaddr);
++	}
++
++	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {
++		ERRMSG("Can't get the symbol of swapper_pg_dir.\n");
++		return NOT_PADDR;
++	}
++
++	swapper_phys = VTOP(SYMBOL(swapper_pg_dir));
++
++	return vtop_riscv64((pgd_t *)swapper_phys, vaddr, NUMBER(va_bits));
++}
++
++#endif /* __riscv64__ */
+diff --git a/makedumpfile-1.7.3/dwarf_info.c b/makedumpfile-1.7.3/dwarf_info.c
+index 543588b..a3a2fd6 100644
+--- a/makedumpfile-1.7.3/dwarf_info.c
++++ b/makedumpfile-1.7.3/dwarf_info.c
+@@ -1091,6 +1091,8 @@ get_symbol_addr(char *symname)
+ out:
+ 	clean_dwfl_info();
+ 
++	DEBUG_MSG("%s   : %s %llx\n", __func__, symname, symbol);
++
+ 	return symbol;
+ }
+ 
+@@ -1175,6 +1177,8 @@ get_next_symbol_addr(char *symname)
+ out:
+ 	clean_dwfl_info();
+ 
++	DEBUG_MSG("%s: %s %lx\n", __func__, symname, next_symbol);
++
+ 	return next_symbol;
+ }
+ 
+@@ -1192,8 +1196,12 @@ get_structure_size(char *structname, int flag_typedef)
+ 	dwarf_info.struct_name = structname;
+ 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+ 
+-	if (!get_debug_info())
++	if (!get_debug_info()) {
++		DEBUG_MSG("%s: %s failed\n", __func__, structname);
+ 		return FAILED_DWARFINFO;
++	}
++
++	DEBUG_MSG("%s: %s %ld\n", __func__, structname, dwarf_info.struct_size);
+ 
+ 	return dwarf_info.struct_size;
+ }
+@@ -1251,8 +1259,13 @@ get_member_offset(char *structname, char *membername, int cmd)
+ 	else
+ 		dwarf_info.member_name = membername;
+ 
+-	if (!get_debug_info())
++	if (!get_debug_info()) {
++		DEBUG_MSG("%s : %s.%s failed\n", __func__, structname, membername);
+ 		return FAILED_DWARFINFO;
++	}
++
++	DEBUG_MSG("%s : %s.%s %ld\n", __func__, structname, membername,
++			dwarf_info.member_offset);
+ 
+ 	return dwarf_info.member_offset;
+ }
+@@ -1309,8 +1322,12 @@ get_array_length(char *name01, char *name02, unsigned int cmd)
+ 	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
+ 	dwarf_info.array_length  = NOT_FOUND_STRUCTURE;
+ 
+-	if (!get_debug_info())
++	if (!get_debug_info()) {
++		DEBUG_MSG("%s  : %s.%s failed\n", __func__, name01, name02);
+ 		return FAILED_DWARFINFO;
++	}
++
++	DEBUG_MSG("%s  : %s.%s %ld\n", __func__, name01, name02, dwarf_info.array_length);
+ 
+ 	return dwarf_info.array_length;
+ }
+@@ -1322,8 +1339,12 @@ get_enum_number(char *enum_name)
+ 	dwarf_info.enum_name   = enum_name;
+ 	dwarf_info.enum_number = NOT_FOUND_NUMBER;
+ 
+-	if (!get_debug_info())
++	if (!get_debug_info()) {
++		DEBUG_MSG("%s   : %s failed\n", __func__, enum_name);
+ 		return FAILED_DWARFINFO;
++	}
++
++	DEBUG_MSG("%s   : %s %ld\n", __func__, enum_name, dwarf_info.enum_number);
+ 
+ 	return dwarf_info.enum_number;
+ }
+diff --git a/makedumpfile-1.7.3/makedumpfile.c b/makedumpfile-1.7.3/makedumpfile.c
+index ba2bb46..a6ec9d4 100644
+--- a/makedumpfile-1.7.3/makedumpfile.c
++++ b/makedumpfile-1.7.3/makedumpfile.c
+@@ -262,13 +262,17 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
+ 	return FALSE;
+ }
+ 
++/* For Linux 6.6 and later */
++#define IS_HUGETLB	((unsigned long)-1)
++
+ static inline int
+ isHugetlb(unsigned long dtor)
+ {
+-        return ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
+-		&& (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
+-                || ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL)
+-                    && (SYMBOL(free_huge_page) == dtor));
++	return (dtor == IS_HUGETLB)
++		|| ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
++		   && (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
++		|| ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL)
++		   && (SYMBOL(free_huge_page) == dtor));
+ }
+ 
+ static int
+@@ -1710,6 +1714,9 @@ get_symbol_info(void)
+ 	return TRUE;
+ }
+ 
++#define MOD_DATA	1
++#define MOD_INIT_DATA	5
++
+ int
+ get_structure_info(void)
+ {
+@@ -1817,6 +1824,26 @@ get_structure_info(void)
+ 	OFFSET_INIT(module.num_symtab, "module", "num_symtab");
+ 	OFFSET_INIT(module.list, "module", "list");
+ 	OFFSET_INIT(module.name, "module", "name");
++
++	/* kernel >= 6.4 */
++	SIZE_INIT(module_memory, "module_memory");
++	if (SIZE(module_memory) != NOT_FOUND_STRUCTURE) {
++		OFFSET_INIT(module.mem, "module", "mem");
++		OFFSET_INIT(module_memory.base, "module_memory", "base");
++		OFFSET_INIT(module_memory.size, "module_memory", "size");
++
++		OFFSET(module.module_core) = OFFSET(module.mem) +
++			SIZE(module_memory) * MOD_DATA + OFFSET(module_memory.base);
++		OFFSET(module.core_size) = OFFSET(module.mem) +
++			SIZE(module_memory) * MOD_DATA + OFFSET(module_memory.size);
++		OFFSET(module.module_init) = OFFSET(module.mem) +
++			SIZE(module_memory) * MOD_INIT_DATA + OFFSET(module_memory.base);
++		OFFSET(module.init_size) = OFFSET(module.mem) +
++			SIZE(module_memory) * MOD_INIT_DATA + OFFSET(module_memory.size);
++
++		goto module_end;
++	}
++
+ 	OFFSET_INIT(module.module_core, "module", "module_core");
+ 	if (OFFSET(module.module_core) == NOT_FOUND_STRUCTURE) {
+ 		/* for kernel version 4.5 and above */
+@@ -1858,6 +1885,7 @@ get_structure_info(void)
+ 		OFFSET(module.init_size) += init_layout;
+ 	}
+ 
++module_end:
+ 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
+ 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
+ 	ENUM_NUMBER_INIT(pgtable_l5_enabled, "pgtable_l5_enabled");
+@@ -1869,6 +1897,7 @@ get_structure_info(void)
+ 	ENUM_NUMBER_INIT(PG_buddy, "PG_buddy");
+ 	ENUM_NUMBER_INIT(PG_slab, "PG_slab");
+ 	ENUM_NUMBER_INIT(PG_hwpoison, "PG_hwpoison");
++	ENUM_NUMBER_INIT(PG_hugetlb, "PG_hugetlb");
+ 
+ 	ENUM_NUMBER_INIT(PG_head_mask, "PG_head_mask");
+ 	if (NUMBER(PG_head_mask) == NOT_FOUND_NUMBER) {
+@@ -2483,6 +2512,7 @@ write_vmcoreinfo_data(void)
+ 	WRITE_NUMBER("PG_buddy", PG_buddy);
+ 	WRITE_NUMBER("PG_slab", PG_slab);
+ 	WRITE_NUMBER("PG_hwpoison", PG_hwpoison);
++	WRITE_NUMBER("PG_hugetlb", PG_hugetlb);
+ 
+ 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
+ 	WRITE_NUMBER("PAGE_OFFLINE_MAPCOUNT_VALUE",
+@@ -2932,6 +2962,7 @@ read_vmcoreinfo(void)
+ 	READ_NUMBER("PG_slab", PG_slab);
+ 	READ_NUMBER("PG_buddy", PG_buddy);
+ 	READ_NUMBER("PG_hwpoison", PG_hwpoison);
++	READ_NUMBER("PG_hugetlb", PG_hugetlb);
+ 	READ_NUMBER("SECTION_SIZE_BITS", SECTION_SIZE_BITS);
+ 	READ_NUMBER("MAX_PHYSMEM_BITS", MAX_PHYSMEM_BITS);
+ 
+@@ -2948,6 +2979,20 @@ read_vmcoreinfo(void)
+ 	READ_NUMBER_UNSIGNED("kimage_voffset", kimage_voffset);
+ #endif
+ 
++#ifdef __riscv64__
++	READ_NUMBER("VA_BITS", va_bits);
++	READ_NUMBER_UNSIGNED("phys_ram_base", phys_ram_base);
++	READ_NUMBER_UNSIGNED("PAGE_OFFSET", page_offset);
++	READ_NUMBER_UNSIGNED("VMALLOC_START", vmalloc_start);
++	READ_NUMBER_UNSIGNED("VMALLOC_END", vmalloc_end);
++	READ_NUMBER_UNSIGNED("VMEMMAP_START", vmemmap_start);
++	READ_NUMBER_UNSIGNED("VMEMMAP_END", vmemmap_end);
++	READ_NUMBER_UNSIGNED("MODULES_VADDR", modules_vaddr);
++	READ_NUMBER_UNSIGNED("MODULES_END", modules_end);
++	READ_NUMBER_UNSIGNED("KERNEL_LINK_ADDR", kernel_link_addr);
++	READ_NUMBER_UNSIGNED("va_kernel_pa_offset", va_kernel_pa_offset);
++#endif
++
+ 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
+ 
+ 	return TRUE;
+@@ -3264,7 +3309,11 @@ get_mm_flatmem(void)
+ 	if (is_xen_memory())
+ 		dump_mem_map(0, info->dom0_mapnr, mem_map, 0);
+ 	else
++#ifdef __riscv64__
++		dump_mem_map((info->phys_base >> PAGESHIFT()), info->max_mapnr, mem_map, 0);
++#else
+ 		dump_mem_map(0, info->max_mapnr, mem_map, 0);
++#endif
+ 
+ 	return TRUE;
+ }
+@@ -6451,6 +6500,21 @@ __exclude_unnecessary_pages(unsigned long mem_map,
+ 		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
+ 			unsigned char *addr = pcache + SIZE(page);
+ 
++			/*
++			 * Linux 6.6 and later.  Kernels that have PG_hugetlb should also
++			 * have the compound order in the low byte of folio._flags_1.
++			 */
++			if (NUMBER(PG_hugetlb) != NOT_FOUND_NUMBER) {
++				unsigned long _flags_1 = ULONG(addr + OFFSET(page.flags));
++
++				compound_order = _flags_1 & 0xff;
++
++				if (_flags_1 & (1UL << NUMBER(PG_hugetlb)))
++					compound_dtor = IS_HUGETLB;
++
++				goto check_order;
++			}
++
+ 			if (order_offset) {
+ 				if (info->kernel_version >= KERNEL_VERSION(4, 16, 0))
+ 					compound_order = UCHAR(addr + order_offset);
+@@ -6470,7 +6534,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
+ 				else
+ 					compound_dtor = ULONG(addr + dtor_offset);
+ 			}
+-
++check_order:
+ 			if ((compound_order >= sizeof(unsigned long) * 8)
+ 			    || ((pfn & ((1UL << compound_order) - 1)) != 0)) {
+ 				/* Invalid order */
+diff --git a/makedumpfile-1.7.3/makedumpfile.h b/makedumpfile-1.7.3/makedumpfile.h
+index 99ccf0a..59a809c 100644
+--- a/makedumpfile-1.7.3/makedumpfile.h
++++ b/makedumpfile-1.7.3/makedumpfile.h
+@@ -498,7 +498,7 @@ do { \
+ #define KVER_MIN_SHIFT 16
+ #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
+ #define OLDEST_VERSION		KERNEL_VERSION(2, 6, 15) /* linux-2.6.15 */
+-#define LATEST_VERSION		KERNEL_VERSION(6, 3, 0) /* linux-6.3.0 */
++#define LATEST_VERSION		KERNEL_VERSION(6, 6, 0)  /* linux-6.6.0 */
+ 
+ /*
+  * vmcoreinfo in /proc/vmcore
+@@ -678,6 +678,12 @@ unsigned long get_kvbase_arm64(void);
+ #define REGION_SHIFT            (60UL)
+ #define VMEMMAP_REGION_ID       (0xfUL)
+ 
++/*
++ * If PAGE_PTE is set, then it's a leaf PTE for hugepage
++ */
++#define PAGE_PTE (1UL << 62)
++#define IS_HUGEPAGE(pte) (!!((pte) & PAGE_PTE))
++
+ /* 4-level page table support */
+ 
+ /* 4K pagesize */
+@@ -1046,6 +1052,77 @@ typedef unsigned long pgd_t;
+ 
+ #endif /* loongarch64 */
+ 
++#ifdef __riscv64__
++/*
++ * Referencing the riscv64_is_kvaddr() in Crash-utility,
++ * set the vmemmap start address as the lowest kernel virtual base.
++ */
++#define KVBASE			(NUMBER(vmemmap_start))
++#define _SECTION_SIZE_BITS	(27)
++#define _MAX_PHYSMEM_BITS	(56)
++
++typedef ulong pgd_t;
++typedef ulong p4d_t;
++typedef ulong pud_t;
++typedef ulong pmd_t;
++typedef ulong pte_t;
++
++/* arch/riscv/include/asm/pgtable-64.h */
++
++#define PGD_SHIFT_L3		(30)
++#define PGD_SHIFT_L4		(39)
++#define PGD_SHIFT_L5		(48)
++
++#define P4D_SHIFT		(39)
++#define PUD_SHIFT		(30)
++#define PMD_SHIFT		(21)
++
++#define PTRS_PER_PGD		(512)
++#define PTRS_PER_P4D		(512)
++#define PTRS_PER_PUD		(512)
++#define PTRS_PER_PMD		(512)
++#define PTRS_PER_PTE		(512)
++
++/*
++ * 3/4/5-levels pg indexs
++ */
++#define pgd_index_l3(addr)	(((addr) >> PGD_SHIFT_L3) & (PTRS_PER_PGD - 1))
++#define pgd_index_l4(addr)	(((addr) >> PGD_SHIFT_L4) & (PTRS_PER_PGD - 1))
++#define pgd_index_l5(addr)	(((addr) >> PGD_SHIFT_L5) & (PTRS_PER_PGD - 1))
++#define p4d_index(addr)		(((addr) >> P4D_SHIFT) & (PTRS_PER_P4D - 1))
++#define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
++#define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
++#define pte_index(addr)		(((addr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
++
++/* arch/riscv/include/asm/pgtable-bits.h */
++
++#define _PAGE_PRESENT	(1 << 0)
++#define _PAGE_READ	(1 << 1)	/* Readable */
++#define _PAGE_WRITE	(1 << 2)	/* Writable */
++#define _PAGE_EXEC	(1 << 3)	/* Executable */
++#define _PAGE_USER	(1 << 4)	/* User */
++#define _PAGE_GLOBAL	(1 << 5)	/* Global */
++#define _PAGE_ACCESSED	(1 << 6)	/* Set by hardware on any access */
++#define _PAGE_DIRTY	(1 << 7)	/* Set by hardware on any write */
++#define _PAGE_SOFT	(1 << 8)	/* Reserved for software */
++
++#define _PAGE_PFN_SHIFT	(10)
++#define _PAGE_LEAF	(_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC)
++
++/*
++ * Mask for bit 0~53(PROT and PPN) of PTE
++ * 63 6261  60    54  53 10  9 8 7 6 5 4 3 2 1 0
++ * N  PBMT  Reserved  P P N  RSW D A G U X W R V
++ */
++#define PTE_PFN_PROT_MASK	0x3FFFFFFFFFFFFF
++
++#define VA_BITS_SV39	(39)
++#define VA_BITS_SV48	(48)
++#define VA_BITS_SV57	(57)
++
++#endif /* riscv64 */
++
++
+ /*
+  * The function of dependence on machine
+  */
+@@ -1233,6 +1310,22 @@ unsigned long long vaddr_to_paddr_loongarch64(unsigned long vaddr);
+ #define arch_crashkernel_mem_size()	stub_false()
+ #endif /* loongarch64 */
+ 
++#ifdef __riscv64__
++int get_phys_base_riscv64(void);
++int get_machdep_info_riscv64(void);
++unsigned long long vaddr_to_paddr_riscv64(unsigned long vaddr);
++#define paddr_to_vaddr_riscv64(X) ((X) + PAGE_OFFSET - info->phys_base)
++#define find_vmemmap()		stub_false()
++#define get_phys_base()		get_phys_base_riscv64()
++#define get_machdep_info()	get_machdep_info_riscv64()
++#define get_versiondep_info()	stub_true()
++#define get_kaslr_offset(X)	stub_false()
++#define vaddr_to_paddr(X)	vaddr_to_paddr_riscv64(X)
++#define paddr_to_vaddr(X)	paddr_to_vaddr_riscv64(X)
++#define is_phys_addr(X)		stub_true_ul(X)
++#define arch_crashkernel_mem_size()	stub_false()
++#endif /* riscv64 */
++
+ typedef unsigned long long mdf_pfn_t;
+ 
+ #ifndef ARCH_PFN_OFFSET
+@@ -1842,6 +1935,7 @@ struct size_table {
+ 	 * for loading module symbol data
+ 	 */
+ 	long	module;
++	long	module_memory;
+ 
+ 	/*
+ 	 * for sadump
+@@ -1944,8 +2038,14 @@ struct offset_table {
+ 		long	num_symtab;
+ 		long	symtab;
+ 		long	strtab;
++		long	mem;
+ 	} module;
+ 
++	struct module_memory {
++		long	base;
++		long	size;
++	} module_memory;
++
+ 	/*
+ 	 * for loading elf_prstaus symbol data
+ 	 */
+@@ -2131,6 +2231,7 @@ struct number_table {
+ 	long	PG_buddy;
+ 	long	PG_slab;
+ 	long    PG_hwpoison;
++	long    PG_hugetlb;
+ 
+ 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
+ 	long	PAGE_OFFLINE_MAPCOUNT_VALUE;
+@@ -2145,6 +2246,19 @@ struct number_table {
+ 	unsigned long	PHYS_OFFSET;
+ 	unsigned long	kimage_voffset;
+ #endif
++#ifdef __riscv64__
++	long va_bits;
++	unsigned long phys_ram_base;
++	unsigned long page_offset;
++	unsigned long vmalloc_start;
++	unsigned long vmalloc_end;
++	unsigned long vmemmap_start;
++	unsigned long vmemmap_end;
++	unsigned long modules_vaddr;
++	unsigned long modules_end;
++	unsigned long kernel_link_addr;
++	unsigned long va_kernel_pa_offset;
++#endif
+ };
+ 
+ struct srcfile_table {
+@@ -2383,6 +2497,12 @@ int get_xen_info_ia64(void);
+ #define get_xen_info_arch(X) FALSE
+ #endif /* loongarch64 */
+ 
++#ifdef __riscv64__ /* riscv64 */
++#define kvtop_xen(X)	FALSE
++#define get_xen_basic_info_arch(X) FALSE
++#define get_xen_info_arch(X) FALSE
++#endif /* riscv64 */
++
+ struct cycle {
+ 	mdf_pfn_t start_pfn;
+ 	mdf_pfn_t end_pfn;
+diff --git a/makedumpfile-1.7.3/makedumpfile.spec b/makedumpfile-1.7.3/makedumpfile.spec
+index 182db54..3b53847 100644
+--- a/makedumpfile-1.7.3/makedumpfile.spec
++++ b/makedumpfile-1.7.3/makedumpfile.spec
+@@ -1,6 +1,6 @@
+ Name: makedumpfile
+ Summary: makedumpfile package
+-Version: 1.7.3
++Version: 1.7.4
+ Release: 1
+ Group: Applications/Text
+ License: GPL
+-- 
+2.34.1
+
